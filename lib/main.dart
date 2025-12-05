@@ -4,6 +4,7 @@ import 'secrets.dart';
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
 import 'pages/contact_page.dart';
+import 'pages/about_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_register_page.dart';
 import 'pages/admin_verify_page.dart';
@@ -44,6 +45,9 @@ class BMTApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
+        '/home': (context) => const HomePage(),
+        '/events': (context) => const EventsPage(),
+        '/about': (context) => const AboutPage(),
         '/': (context) => const HomePage(),
         '/home': (context) => const HomePage(),
         '/events': (context) => const EventsPage(),
