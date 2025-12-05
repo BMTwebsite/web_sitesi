@@ -61,7 +61,7 @@ class Header extends StatelessWidget {
                 text: 'Hakkımızda',
                 route: '/about',
                 isActive: currentRoute == '/about',
-                onTap: () {},
+                onTap: () => Navigator.pushNamed(context, '/about'),
               ),
               const SizedBox(width: 30),
               _NavItem(
