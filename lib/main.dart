@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'secrets.dart';
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
+import 'pages/contact_page.dart';
 import 'pages/about_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_register_page.dart';
@@ -48,6 +49,9 @@ class BMTApp extends StatelessWidget {
         '/events': (context) => const EventsPage(),
         '/about': (context) => const AboutPage(),
         '/': (context) => const HomePage(),
+        '/home': (context) => const HomePage(),
+        '/events': (context) => const EventsPage(),
+        '/contact': (context) => const ContactPage(),
         '/admin-login': (context) => const AdminLoginPage(),
         '/admin-register': (context) => const AdminRegisterPage(),
         '/admin-panel': (context) => const AdminPanelPage(),
@@ -60,7 +64,9 @@ class BMTApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         // Handle /verify?token=xxx route
         if (settings.name == '/verify') {
-          final uri = Uri.parse(settings.name! + (settings.arguments as String? ?? ''));
+          final uri = Uri.parse(
+            settings.name! + (settings.arguments as String? ?? ''),
+          );
           final token = uri.queryParameters['token'];
           return MaterialPageRoute(
             builder: (context) => AdminVerifyPage(token: token),

@@ -164,7 +164,7 @@ class _HeaderState extends State<_Header> {
                 isActive: _currentRoute == '/contact',
                 onTap: () {
                   setState(() => _currentRoute = '/contact');
-                  // TODO: Implement contact page
+                  Navigator.pushNamed(context, '/contact');
                 },
               ),
             ],

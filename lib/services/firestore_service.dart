@@ -18,6 +18,8 @@ class FirestoreService {
   final String _eventsCollection = 'events';
   final String _pendingAdminsCollection = 'pending_admins';
   final String _adminsCollection = 'admins';
+  final String _contactSettingsCollection = 'contact_settings';
+  final String _contactSettingsDocId = 'main';
 
 
   // Get all events
@@ -204,6 +206,99 @@ class FirestoreService {
         .get();
     
     return query.docs.isNotEmpty;
+  }
+
+  // Get contact settings
+  Future<Map<String, dynamic>> getContactSettings() async {
+    final doc = await _firestore
+        .collection(_contactSettingsCollection)
+        .doc(_contactSettingsDocId)
+        .get();
+    
+    if (!doc.exists) {
+      // Return default values if document doesn't exist
+      return {
+        'email': 'info@bmt.edu.tr',
+        'socialMedia': [
+          {
+            'name': 'Instagram',
+            'icon': 'camera_alt',
+            'url': 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
+            'color': '#E4405F',
+          },
+          {
+            'name': 'LinkedIn',
+            'icon': 'business',
+            'url': 'https://www.linkedin.com/company/banubmt/',
+            'color': '#0077B5',
+          },
+          {
+            'name': 'YouTube',
+            'icon': 'play_circle_filled',
+            'url': 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
+            'color': '#FF0000',
+          },
+          {
+            'name': 'TikTok',
+            'icon': 'music_note',
+            'url': 'https://www.tiktok.com/@banubmt',
+            'color': '#000000',
+          },
+        ],
+      };
+    }
+    
+    return doc.data()!;
+  }
+
+  // Stream contact settings
+  Stream<Map<String, dynamic>> getContactSettingsStream() {
+    return _firestore
+        .collection(_contactSettingsCollection)
+        .doc(_contactSettingsDocId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) {
+        return {
+          'email': 'info@bmt.edu.tr',
+          'socialMedia': [
+            {
+              'name': 'Instagram',
+              'icon': 'camera_alt',
+              'url': 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
+              'color': '#E4405F',
+            },
+            {
+              'name': 'LinkedIn',
+              'icon': 'business',
+              'url': 'https://www.linkedin.com/company/banubmt/',
+              'color': '#0077B5',
+            },
+            {
+              'name': 'YouTube',
+              'icon': 'play_circle_filled',
+              'url': 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
+              'color': '#FF0000',
+            },
+            {
+              'name': 'TikTok',
+              'icon': 'music_note',
+              'url': 'https://www.tiktok.com/@banubmt',
+              'color': '#000000',
+            },
+          ],
+        };
+      }
+      return snapshot.data()!;
+    });
+  }
+
+  // Update contact settings
+  Future<void> updateContactSettings(Map<String, dynamic> settings) async {
+    await _firestore
+        .collection(_contactSettingsCollection)
+        .doc(_contactSettingsDocId)
+        .set(settings, SetOptions(merge: true));
   }
 
 }

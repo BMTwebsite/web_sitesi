@@ -6,7 +6,7 @@ class Footer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 50),
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
       color: const Color(0xFF0A1929),
       child: Column(
         children: [
@@ -20,6 +20,7 @@ class Footer extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           width: 50,
@@ -35,12 +36,17 @@ class Footer extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Bilgisayar Mühendisliği Topluluğu',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            'Bilgisayar Mühendisliği Topluluğu',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
                           ),
                         ),
                       ],
@@ -64,7 +70,7 @@ class Footer extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 40),
+              const SizedBox(width: 20),
               // Column 2: Contact Info
               Expanded(
                 child: Column(
@@ -91,12 +97,12 @@ class Footer extends StatelessWidget {
                     const SizedBox(height: 12),
                     _ContactItem(
                       icon: Icons.location_on,
-                      text: 'Bayburt Üniversitesi',
+                      text: 'Bandırma Onyedi Eylül Üniversitesi',
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 40),
+              const SizedBox(width: 20),
               // Column 3: Social Media
               Expanded(
                 child: Column(
