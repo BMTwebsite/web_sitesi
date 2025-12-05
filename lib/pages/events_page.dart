@@ -9,21 +9,14 @@ class EventsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
-      body: Column(
-        children: [
-          const HeaderWidget(),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _EventsContent(),
-                  const FooterWidget(),
-                ],
-              ),
-            ),
-          ),
-        ],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const Header(currentRoute: '/events'),
+            _EventsContent(),
+            const Footer(),
+          ],
+        ),
       ),
     );
   }
@@ -43,6 +36,7 @@ class _EventsContent extends StatelessWidget {
         children: [
           const Text(
             'Yaklaşan Etkinlikler',
+            'Etkinlik Takvimi',
             style: TextStyle(
               color: Colors.white,
               fontSize: 48,
@@ -52,6 +46,7 @@ class _EventsContent extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             'Yaklaşan etkinliklerimize göz atın',
+            'Yaklaşan etkinliklerimize göz atın ve teknoloji dünyasında bir adım öne geçin',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 18,
@@ -120,6 +115,18 @@ class _EventsContent extends StatelessWidget {
                       return _EventCard(events[index]);
                     },
                   );
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  return _EventCard(events[index]);
                 },
               );
             },
@@ -149,6 +156,7 @@ class _EventCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top colored section
           Container(
             height: 80,
             decoration: BoxDecoration(
@@ -169,6 +177,7 @@ class _EventCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -188,6 +197,7 @@ class _EventCard extends StatelessWidget {
               ],
             ),
           ),
+          // Content
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -211,10 +221,46 @@ class _EventCard extends StatelessWidget {
                   _EventInfo(icon: Icons.access_time, text: event.time),
                   const SizedBox(height: 8),
                   _EventInfo(icon: Icons.location_on, text: event.location),
+                  _EventInfo(
+                    icon: Icons.calendar_today,
+                    text: event.date,
+                  ),
+                  const SizedBox(height: 8),
+                  _EventInfo(
+                    icon: Icons.access_time,
+                    text: event.time,
+                  ),
+                  const SizedBox(height: 8),
+                  _EventInfo(
+                    icon: Icons.location_on,
+                    text: event.location,
+                  ),
                   const Spacer(),
                   _EventInfo(
                     icon: Icons.people,
                     text: '${event.participants} Katılımcı',
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: event.color,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Kayıt Ol',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
