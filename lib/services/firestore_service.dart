@@ -309,6 +309,22 @@ class FirestoreService {
         .set(settings, SetOptions(merge: true));
   }
 
+  // Reject admin by token (delete from pending_admins)
+  Future<void> rejectAdmin(String token) async {
+    final query = await _firestore
+        .collection(_pendingAdminsCollection)
+        .where('token', isEqualTo: token)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) {
+      throw 'Geçersiz red linki.';
+    }
+
+    // Delete from pending_admins
+    await query.docs.first.reference.delete();
+  }
+
 }
 
 class EventData {

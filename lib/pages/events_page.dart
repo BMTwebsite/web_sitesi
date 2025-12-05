@@ -12,9 +12,9 @@ class EventsPage extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const Header(currentRoute: '/events'),
+            const HeaderWidget(),
             _EventsContent(),
-            const Footer(),
+            const FooterWidget(),
           ],
         ),
       ),
@@ -35,7 +35,6 @@ class _EventsContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Yaklaşan Etkinlikler',
             'Etkinlik Takvimi',
             style: TextStyle(
               color: Colors.white,
@@ -45,7 +44,6 @@ class _EventsContent extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Yaklaşan etkinliklerimize göz atın',
             'Yaklaşan etkinliklerimize göz atın ve teknoloji dünyasında bir adım öne geçin',
             style: TextStyle(
               color: Colors.white70,
@@ -115,18 +113,6 @@ class _EventsContent extends StatelessWidget {
                       return _EventCard(events[index]);
                     },
                   );
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: events.length,
-                itemBuilder: (context, index) {
-                  return _EventCard(events[index]);
                 },
               );
             },
@@ -149,7 +135,7 @@ class _EventCard extends StatelessWidget {
         color: const Color(0xFF1A2332),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Colors.white.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -176,7 +162,6 @@ class _EventCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -221,20 +206,6 @@ class _EventCard extends StatelessWidget {
                   _EventInfo(icon: Icons.access_time, text: event.time),
                   const SizedBox(height: 8),
                   _EventInfo(icon: Icons.location_on, text: event.location),
-                  _EventInfo(
-                    icon: Icons.calendar_today,
-                    text: event.date,
-                  ),
-                  const SizedBox(height: 8),
-                  _EventInfo(
-                    icon: Icons.access_time,
-                    text: event.time,
-                  ),
-                  const SizedBox(height: 8),
-                  _EventInfo(
-                    icon: Icons.location_on,
-                    text: event.location,
-                  ),
                   const Spacer(),
                   _EventInfo(
                     icon: Icons.people,
