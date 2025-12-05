@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
+import 'pages/about_page.dart';
 
 void main() {
   runApp(const BMTApp());
@@ -29,6 +30,7 @@ class BMTApp extends StatelessWidget {
       routes: {
         '/home': (context) => const HomePage(),
         '/events': (context) => const EventsPage(),
+        '/about': (context) => const AboutPage(),
       },
     );
   }
