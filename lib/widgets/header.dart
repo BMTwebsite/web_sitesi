@@ -88,7 +88,7 @@ class Header extends StatelessWidget {
                 text: 'İletişim',
                 route: '/contact',
                 isActive: currentRoute == '/contact',
-                onTap: () {},
+                onTap: () => Navigator.pushNamed(context, '/contact'),
               ),
             ],
           ),
