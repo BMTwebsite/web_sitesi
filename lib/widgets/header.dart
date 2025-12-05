@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 
 class Header extends StatelessWidget {
   final String currentRoute;
@@ -89,6 +90,65 @@ class Header extends StatelessWidget {
                 route: '/contact',
                 isActive: currentRoute == '/contact',
                 onTap: () => Navigator.pushNamed(context, '/contact'),
+              ),
+              const SizedBox(width: 30),
+              // Admin Button
+              StreamBuilder(
+                stream: AuthService().authStateChanges,
+                builder: (context, authSnapshot) {
+                  if (!authSnapshot.hasData) {
+                    return OutlinedButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/admin-login'),
+                      icon: const Icon(Icons.login, size: 18),
+                      label: const Text('Admin Girişi'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  return FutureBuilder<bool>(
+                    future: AuthService().isAdmin(),
+                    builder: (context, adminSnapshot) {
+                      final isAdmin = adminSnapshot.data ?? false;
+                      
+                      if (isAdmin) {
+                        return OutlinedButton.icon(
+                          onPressed: () => Navigator.pushNamed(context, '/admin-panel'),
+                          icon: const Icon(Icons.admin_panel_settings, size: 18),
+                          label: const Text('Admin Paneli'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0xFF2196F3)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                        );
+                      } else {
+                        return OutlinedButton.icon(
+                          onPressed: () => Navigator.pushNamed(context, '/admin-login'),
+                          icon: const Icon(Icons.login, size: 18),
+                          label: const Text('Admin Girişi'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
               ),
             ],
           ),

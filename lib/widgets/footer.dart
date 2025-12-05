@@ -97,7 +97,7 @@ class Footer extends StatelessWidget {
                     const SizedBox(height: 12),
                     _ContactItem(
                       icon: Icons.location_on,
-                      text: 'Bayburt Üniversitesi',
+                      text: 'Bandırma Onyedi Eylül Üniversitesi',
                     ),
                   ],
                 ),

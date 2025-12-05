@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
+import '../services/firestore_service.dart';
 
 class EventsPage extends StatelessWidget {
   const EventsPage({super.key});
@@ -22,80 +23,7 @@ class EventsPage extends StatelessWidget {
 }
 
 class _EventsContent extends StatelessWidget {
-  final List<EventData> events = [
-    EventData(
-      type: 'Workshop',
-      title: 'Yapay Zeka ve Makine Öğrenmesi Workshop',
-      date: '15 Aralık 2025',
-      time: '14:00',
-      location: 'Konferans Salonu A',
-      participants: 45,
-      color: const Color(0xFF2196F3),
-    ),
-    EventData(
-      type: 'Bootcamp',
-      title: 'Web Geliştirme Bootcamp',
-      date: '20 Aralık 2025',
-      time: '10:00',
-      location: 'Bilgisayar Laboratuvarı',
-      participants: 60,
-      color: const Color(0xFFF44336),
-    ),
-    EventData(
-      type: 'Seminer',
-      title: 'Siber Güvenlik Semineri',
-      date: '22 Aralık 2025',
-      time: '15:30',
-      location: 'Amfi 3',
-      participants: 80,
-      color: const Color(0xFF2196F3),
-    ),
-    EventData(
-      type: 'Workshop',
-      title: 'Mobil Uygulama Geliştirme',
-      date: '28 Aralık 2025',
-      time: '13:00',
-      location: 'Laboratuvar B',
-      participants: 35,
-      color: const Color(0xFFF44336),
-    ),
-    EventData(
-      type: 'Seminer',
-      title: 'Blockchain Teknolojileri',
-      date: '5 Ocak 2026',
-      time: '16:00',
-      location: 'Konferans Salonu B',
-      participants: 55,
-      color: const Color(0xFF2196F3),
-    ),
-    EventData(
-      type: 'Panel',
-      title: 'Kariyer Paneli',
-      date: '10 Ocak 2026',
-      time: '14:00',
-      location: 'Amfi 1',
-      participants: 100,
-      color: const Color(0xFFF44336),
-    ),
-    EventData(
-      type: 'Atölye',
-      title: 'UI/UX Tasarım Atölyesi',
-      date: '15 Ocak 2026',
-      time: '11:00',
-      location: 'Tasarım Stüdyosu',
-      participants: 40,
-      color: const Color(0xFF2196F3),
-    ),
-    EventData(
-      type: 'Workshop',
-      title: 'DevOps ve CI/CD',
-      date: '20 Ocak 2026',
-      time: '13:30',
-      location: 'Laboratuvar A',
-      participants: 50,
-      color: const Color(0xFFF44336),
-    ),
-  ];
+  final _firestoreService = FirestoreService();
 
   @override
   Widget build(BuildContext context) {
@@ -121,44 +49,64 @@ class _EventsContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 40),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: events.length,
-            itemBuilder: (context, index) {
-              return _EventCard(events[index]);
+          StreamBuilder<List<EventData>>(
+            stream: _firestoreService.getEvents(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Text(
+                      'Etkinlikler yüklenirken bir hata oluştu: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                );
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Text(
+                      'Henüz etkinlik eklenmemiş.',
+                      style: TextStyle(color: Colors.white70, fontSize: 18),
+                    ),
+                  ),
+                );
+              }
+
+              final events = snapshot.data!;
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  return _EventCard(events[index]);
+                },
+              );
             },
           ),
         ],
       ),
     );
   }
-}
-
-class EventData {
-  final String type;
-  final String title;
-  final String date;
-  final String time;
-  final String location;
-  final int participants;
-  final Color color;
-
-  EventData({
-    required this.type,
-    required this.title,
-    required this.date,
-    required this.time,
-    required this.location,
-    required this.participants,
-    required this.color,
-  });
 }
 
 class _EventCard extends StatelessWidget {

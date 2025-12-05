@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
+import '../services/firestore_service.dart';
 
 // Conditional import for web and non-web platforms
 import 'map_helper_stub.dart'
@@ -15,6 +16,7 @@ class ContactPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A1929),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -29,37 +31,92 @@ class ContactPage extends StatelessWidget {
 }
 
 class _ContactContent extends StatelessWidget {
-  final List<SocialMedia> socialMediaList = [
-    SocialMedia(
-      name: 'Instagram',
-      icon: Icons.camera_alt,
-      url: 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
-      color: const Color(0xFFE4405F),
-    ),
-    SocialMedia(
-      name: 'LinkedIn',
-      icon: Icons.business,
-      url: 'https://www.linkedin.com/company/banubmt/',
-      color: const Color(0xFF0077B5),
-    ),
-    SocialMedia(
-      name: 'YouTube',
-      icon: Icons.play_circle_filled,
-      url: 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
-      color: const Color(0xFFFF0000),
-    ),
-    SocialMedia(
-      name: 'TikTok',
-      icon: Icons.music_note,
-      url: 'https://www.tiktok.com',
-      color: const Color(0xFF000000),
-    ),
-  ];
+  final _firestoreService = FirestoreService();
+
+  List<SocialMedia> _parseSocialMedia(List<dynamic>? socialMediaData) {
+    if (socialMediaData == null) {
+      return _getDefaultSocialMedia();
+    }
+
+    return socialMediaData.map((item) {
+      final data = item as Map<String, dynamic>;
+      return SocialMedia(
+        name: data['name'] ?? '',
+        icon: _getIconData(data['icon'] ?? 'link'),
+        url: data['url'] ?? '',
+        color: _parseColor(data['color'] ?? '#2196F3'),
+      );
+    }).toList();
+  }
+
+  List<SocialMedia> _getDefaultSocialMedia() {
+    return [
+      SocialMedia(
+        name: 'Instagram',
+        icon: Icons.camera_alt,
+        url: 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
+        color: const Color(0xFFE4405F),
+      ),
+      SocialMedia(
+        name: 'LinkedIn',
+        icon: Icons.business,
+        url: 'https://www.linkedin.com/company/banubmt/',
+        color: const Color(0xFF0077B5),
+      ),
+      SocialMedia(
+        name: 'YouTube',
+        icon: Icons.play_circle_filled,
+        url: 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
+        color: const Color(0xFFFF0000),
+      ),
+      SocialMedia(
+        name: 'TikTok',
+        icon: Icons.music_note,
+        url: 'https://www.tiktok.com/@banubmt',
+        color: const Color(0xFF000000),
+      ),
+    ];
+  }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'camera_alt':
+        return Icons.camera_alt;
+      case 'business':
+        return Icons.business;
+      case 'play_circle_filled':
+        return Icons.play_circle_filled;
+      case 'music_note':
+        return Icons.music_note;
+      case 'link':
+        return Icons.link;
+      case 'facebook':
+        return Icons.facebook;
+      case 'language':
+        return Icons.language;
+      default:
+        return Icons.link;
+    }
+  }
+
+  Color _parseColor(String colorHex) {
+    try {
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return const Color(0xFF2196F3);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 60),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 20 : 60,
+        vertical: isMobile ? 40 : 60,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -93,128 +150,236 @@ class _ContactContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                const Text(
+                Text(
                   'İletişim',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 56,
+                    fontSize: isMobile ? 40 : 56,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Bizimle iletişime geçin ve sorularınızı bize iletin',
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 0),
+                  child: const Text(
+                    'Bizimle iletişime geçin ve sorularınızı bize iletin',
+                    style: TextStyle(color: Colors.white70, fontSize: 18),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 60),
+          SizedBox(height: isMobile ? 40 : 60),
 
           // İletişim Bilgileri ve Sosyal Medya Grid
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sol Taraf - İletişim Bilgileri
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'İletişim Bilgileri',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    _ContactInfoCard(
-                      icon: Icons.email,
-                      title: 'E-posta',
-                      content: 'info@bmt.edu.tr',
-                      color: const Color(0xFF2196F3),
-                      onTap: () async {
-                        final Uri emailUri = Uri(
-                          scheme: 'mailto',
-                          path: 'info@bmt.edu.tr',
-                        );
-                        if (await canLaunchUrl(emailUri)) {
-                          await launchUrl(emailUri);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    _ContactInfoCard(
-                      icon: Icons.location_on,
-                      title: 'Adres',
-                      content:
-                          'Bandırma Onyedi Eylül Üniversitesi\nBilgisayar Mühendisliği ',
-                      color: const Color(0xFFF44336),
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 40),
-              // Sağ Taraf - Sosyal Medya
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Sosyal Medya Hesaplarımız',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
-                    ),
-                    const SizedBox(height: 30),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 20,
-                            mainAxisSpacing: 20,
-                            childAspectRatio: 1.2,
+          StreamBuilder<Map<String, dynamic>>(
+            stream: _firestoreService.getContactSettingsStream(),
+            builder: (context, snapshot) {
+              final email = snapshot.data?['email'] ?? 'info@bmt.edu.tr';
+              final socialMediaList = _parseSocialMedia(
+                snapshot.data?['socialMedia'],
+              );
+
+              return isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // İletişim Bilgileri
+                        const Text(
+                          'İletişim Bilgileri',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
                           ),
-                      itemCount: socialMediaList.length,
-                      itemBuilder: (context, index) {
-                        return _SocialMediaCard(socialMediaList[index]);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                        ),
+                        const SizedBox(height: 20),
+                        _ContactInfoCard(
+                          icon: Icons.email,
+                          title: 'E-posta',
+                          content: email,
+                          color: const Color(0xFF2196F3),
+                          onTap: () async {
+                            final Uri emailUri = Uri(
+                              scheme: 'mailto',
+                              path: email,
+                            );
+                            if (await canLaunchUrl(emailUri)) {
+                              await launchUrl(emailUri);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _ContactInfoCard(
+                          icon: Icons.location_on,
+                          title: 'Adres',
+                          content:
+                              'Bandırma Onyedi Eylül Üniversitesi\nBilgisayar Mühendisliği Bölümü\nBandırma, Balıkesir',
+                          color: const Color(0xFFF44336),
+                          onTap: () async {
+                            final Uri mapUri = Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=Bandırma+Onyedi+Eylül+Üniversitesi',
+                            );
+                            if (await canLaunchUrl(mapUri)) {
+                              await launchUrl(
+                                mapUri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 40),
+                        // Sosyal Medya
+                        const Text(
+                          'Sosyal Medya Hesaplarımız',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        const SizedBox(height: 20),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: 1.1,
+                              ),
+                          itemCount: socialMediaList.length,
+                          itemBuilder: (context, index) {
+                            return _SocialMediaCard(socialMediaList[index]);
+                          },
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Sol Taraf - İletişim Bilgileri
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'İletişim Bilgileri',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+                              _ContactInfoCard(
+                                icon: Icons.email,
+                                title: 'E-posta',
+                                content: email,
+                                color: const Color(0xFF2196F3),
+                                onTap: () async {
+                                  final Uri emailUri = Uri(
+                                    scheme: 'mailto',
+                                    path: email,
+                                  );
+                                  if (await canLaunchUrl(emailUri)) {
+                                    await launchUrl(emailUri);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                              _ContactInfoCard(
+                                icon: Icons.location_on,
+                                title: 'Adres',
+                                content:
+                                    'Bandırma Onyedi Eylül Üniversitesi\nBilgisayar Mühendisliği Bölümü\nBandırma, Balıkesir',
+                                color: const Color(0xFFF44336),
+                                onTap: () async {
+                                  final Uri mapUri = Uri.parse(
+                                    'https://www.google.com/maps/search/?api=1&query=Bandırma+Onyedi+Eylül+Üniversitesi',
+                                  );
+                                  if (await canLaunchUrl(mapUri)) {
+                                    await launchUrl(
+                                      mapUri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 40),
+                        // Sağ Taraf - Sosyal Medya
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Sosyal Medya Hesaplarımız',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 20,
+                                      mainAxisSpacing: 20,
+                                      childAspectRatio: 1.2,
+                                    ),
+                                itemCount: socialMediaList.length,
+                                itemBuilder: (context, index) {
+                                  return _SocialMediaCard(
+                                    socialMediaList[index],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+            },
           ),
-          const SizedBox(height: 60),
+          SizedBox(height: isMobile ? 40 : 60),
 
           // Harita veya Ekstra Bilgi Bölümü
           Container(
-            padding: const EdgeInsets.all(40),
+            padding: EdgeInsets.all(isMobile ? 20 : 40),
             decoration: BoxDecoration(
               color: const Color(0xFF1A2332),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
+            child: isMobile
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
@@ -222,7 +387,9 @@ class _ContactContent extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3).withOpacity(0.2),
+                              color: const Color(
+                                0xFF2196F3,
+                              ).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -236,7 +403,7 @@ class _ContactContent extends StatelessWidget {
                             'Mesaj Gönderin',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -251,87 +418,211 @@ class _ContactContent extends StatelessWidget {
                           height: 1.6,
                         ),
                       ),
-                      const SizedBox(height: 30),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final Uri emailUri = Uri(
-                            scheme: 'mailto',
-                            path: 'info@bmt.edu.tr',
-                            query: 'subject=İletişim Formu',
-                          );
-                          if (await canLaunchUrl(emailUri)) {
-                            await launchUrl(emailUri);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2196F3),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final Uri emailUri = Uri(
+                              scheme: 'mailto',
+                              path: 'info@bmt.edu.tr',
+                              query: 'subject=İletişim Formu',
+                            );
+                            if (await canLaunchUrl(emailUri)) {
+                              await launchUrl(emailUri);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2196F3),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.email, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'E-posta Gönder',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1929),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: kIsWeb
+                              ? const _GoogleMapWidget()
+                              : const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.map,
+                                        color: Colors.white54,
+                                        size: 48,
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'Harita',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.email, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'E-posta Gönder',
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF2196F3,
+                                    ).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.message,
+                                    color: Color(0xFF2196F3),
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Text(
+                                  'Mesaj Gönderin',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
                               style: TextStyle(
+                                color: Colors.white70,
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                height: 1.6,
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+                            ElevatedButton(
+                              onPressed: () async {
+                                final Uri emailUri = Uri(
+                                  scheme: 'mailto',
+                                  path: 'info@bmt.edu.tr',
+                                  query: 'subject=İletişim Formu',
+                                );
+                                if (await canLaunchUrl(emailUri)) {
+                                  await launchUrl(emailUri);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2196F3),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.email, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'E-posta Gönder',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 40),
-                Container(
-                  width: 300,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A1929),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: kIsWeb
-                        ? const _GoogleMapWidget()
-                        : const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.map,
-                                  color: Colors.white54,
-                                  size: 48,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Harita',
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 16,
+                      const SizedBox(width: 40),
+                      Container(
+                        width: 300,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A1929),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: kIsWeb
+                              ? const _GoogleMapWidget()
+                              : const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.map,
+                                        color: Colors.white54,
+                                        size: 48,
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'Harita',
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -353,218 +644,13 @@ class SocialMedia {
   });
 }
 
-class _TikTokGlitchIcon extends StatelessWidget {
-  final double size;
-
-  const _TikTokGlitchIcon({this.size = 32});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Cyan shadow (top-left)
-          Positioned(
-            top: -2,
-            left: -2,
-            child: Icon(
-              Icons.music_note,
-              color: const Color(0xFF00F2EA),
-              size: size,
-            ),
-          ),
-          // Red shadow (bottom-right)
-          Positioned(
-            bottom: -2,
-            right: -2,
-            child: Icon(
-              Icons.music_note,
-              color: const Color(0xFFFF0050),
-              size: size,
-            ),
-          ),
-          // White main icon
-          Icon(Icons.music_note, color: Colors.white, size: size),
-        ],
-      ),
-    );
-  }
-}
-
-class _YouTubeIcon extends StatelessWidget {
-  final double size;
-
-  const _YouTubeIcon({this.size = 32});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size * 1.2,
-      height: size * 0.85,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF0000),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Center(
-        child: CustomPaint(
-          size: Size(size * 0.5, size * 0.5),
-          painter: _PlayButtonPainter(),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlayButtonPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    // Üçgen çizmek için path kullanıyoruz
-    path.moveTo(size.width * 0.2, size.height * 0.1);
-    path.lineTo(size.width * 0.2, size.height * 0.9);
-    path.lineTo(size.width * 0.9, size.height * 0.5);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LinkedInIcon extends StatelessWidget {
-  final double size;
-
-  const _LinkedInIcon({this.size = 32});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0077B5),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Center(
-        child: Text(
-          'in',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.65,
-            fontWeight: FontWeight.bold,
-            height: 1.0,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InstagramIcon extends StatelessWidget {
-  final double size;
-
-  const _InstagramIcon({this.size = 32});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF833AB4), // Mor
-            Color(0xFFE1306C), // Pembe
-            Color(0xFFF77737), // Turuncu
-            Color(0xFFFCAF45), // Sarı
-          ],
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: CustomPaint(
-          size: Size(size * 0.7, size * 0.7),
-          painter: _CameraIconPainter(),
-        ),
-      ),
-    );
-  }
-}
-
-class _CameraIconPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    // Kamera gövdesi (yuvarlatılmış dikdörtgen)
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width * 0.15,
-        size.height * 0.2,
-        size.width * 0.7,
-        size.height * 0.6,
-      ),
-      const Radius.circular(4),
-    );
-    canvas.drawRRect(rect, paint);
-
-    // Ana lens (büyük daire)
-    final lensPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawCircle(
-      Offset(size.width * 0.5, size.height * 0.5),
-      size.width * 0.2,
-      lensPaint,
-    );
-
-    // Viewfinder/flash (küçük daire - sağ üst)
-    final viewfinderPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      Offset(size.width * 0.7, size.height * 0.3),
-      size.width * 0.08,
-      viewfinderPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _SocialMediaCard extends StatelessWidget {
   final SocialMedia socialMedia;
 
   const _SocialMediaCard(this.socialMedia);
 
   Widget _getSocialMediaIcon(String name) {
-    switch (name) {
-      case 'TikTok':
-        return const _TikTokGlitchIcon(size: 32);
-      case 'YouTube':
-        return const _YouTubeIcon(size: 32);
-      case 'LinkedIn':
-        return const _LinkedInIcon(size: 32);
-      case 'Instagram':
-        return const _InstagramIcon(size: 36);
-      default:
-        return Icon(socialMedia.icon, color: socialMedia.color, size: 32);
-    }
+    return Icon(socialMedia.icon, color: socialMedia.color, size: 48);
   }
 
   @override
@@ -581,15 +667,18 @@ class _SocialMediaCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A2332),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 1,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: socialMedia.color.withOpacity(0.2),
+                color: socialMedia.color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: _getSocialMediaIcon(socialMedia.name),
@@ -637,7 +726,10 @@ class _ContactInfoCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A2332),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 1,
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -645,7 +737,7 @@ class _ContactInfoCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),

@@ -1,10 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'secrets.dart';
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
 import 'pages/contact_page.dart';
+import 'pages/admin_login_page.dart';
+import 'pages/admin_register_page.dart';
+import 'pages/admin_verify_page.dart';
+import 'pages/admin_panel_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: Secrets.firebaseApiKey,
+      authDomain: Secrets.firebaseAuthDomain,
+      projectId: Secrets.firebaseProjectId,
+      storageBucket: Secrets.firebaseStorageBucket,
+      messagingSenderId: Secrets.firebaseMessagingSenderId,
+      appId: Secrets.firebaseAppId,
+    ),
+  );
   runApp(const BMTApp());
 }
 
@@ -14,7 +30,7 @@ class BMTApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bilgisayar Mühendisliği Topluluğu',
+      title: 'BMT Web Sitesi',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -26,11 +42,33 @@ class BMTApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF0A1929),
       ),
-      home: const HomePage(),
+      initialRoute: '/',
       routes: {
+        '/': (context) => const HomePage(),
         '/home': (context) => const HomePage(),
         '/events': (context) => const EventsPage(),
         '/contact': (context) => const ContactPage(),
+        '/admin-login': (context) => const AdminLoginPage(),
+        '/admin-register': (context) => const AdminRegisterPage(),
+        '/admin-panel': (context) => const AdminPanelPage(),
+        '/admin-verify': (context) {
+          final uri = Uri.base;
+          final token = uri.queryParameters['token'];
+          return AdminVerifyPage(token: token);
+        },
+      },
+      onGenerateRoute: (settings) {
+        // Handle /verify?token=xxx route
+        if (settings.name == '/verify') {
+          final uri = Uri.parse(
+            settings.name! + (settings.arguments as String? ?? ''),
+          );
+          final token = uri.queryParameters['token'];
+          return MaterialPageRoute(
+            builder: (context) => AdminVerifyPage(token: token),
+          );
+        }
+        return null;
       },
     );
   }
