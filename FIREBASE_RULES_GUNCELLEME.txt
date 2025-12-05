@@ -1,0 +1,43 @@
+📋 FIREBASE RULES GÜNCELLEME REHBERİ
+
+Mevcut kurallarınız:
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;  // ❌ Bu her şeyi engelliyor!
+    }
+  }
+}
+```
+
+✅ YENİ KURALLAR (TÜMÜNÜ SİLİP BUNU YAPIŞTIRIN):
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /pending_admins/{document=**} {
+      allow read, write: if true;
+    }
+    match /events/{document=**} {
+      allow read, write: if true;
+    }
+    match /admins/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+🔧 ADIM ADIM:
+
+1. Firebase Console'da Rules sekmesine gidin
+2. TÜM MEVCUT KURALLARI SİLİN (Ctrl+A, Delete)
+3. Yukarıdaki YENİ KURALLARI kopyalayıp yapıştırın
+4. ✅ Publish butonuna tıklayın
+5. ⏳ 30 saniye bekleyin
+6. 🔄 Uygulamayı yeniden başlatın (R tuşu)
+
+⚠️ NOT: Bu kurallar geçici olarak HERKESE izin verir (test için).
+   Production'da daha güvenli kurallar kullanmalısınız.
+

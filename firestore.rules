@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Geçici olarak tüm koleksiyonlara tam erişim (test için)
+    // Production'da daha güvenli kurallar kullanılmalı
+    match /pending_admins/{document=**} {
+      allow read, write: if true;
+    }
+    match /events/{document=**} {
+      allow read, write: if true;
+    }
+    match /admins/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

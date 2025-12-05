@@ -3,124 +3,23 @@ import '../services/firestore_service.dart';
 import '../widgets/header_widget.dart';
 import '../widgets/footer_widget.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class EventsPage extends StatelessWidget {
+  const EventsPage({super.key});
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const HeaderWidget(),
-            _HeroSection(),
-            _EventsSection(),
-            const FooterWidget(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-class _HeroSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 80),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: const Color(0xFF0A1929),
+      body: Column(
         children: [
+          const HeaderWidget(),
           Expanded(
-            flex: 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A2332),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.cable,
-                        color: Color(0xFF2196F3),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Bilgisayar Mühendisliği Topluluğu',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                const Text(
-                  'Kodla Geleceği',
-                  style: TextStyle(
-                    color: Color(0xFF2196F3),
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const Text(
-                  'Tasarla Yarını',
-                  style: TextStyle(
-                    color: Color(0xFFF44336),
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const Text(
-                  'Birlikte Başaralım',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                const Text(
-                  'Bilgisayar Mühendisliği Topluluğu olarak, teknolojiye tutkulu öğrencileri bir araya getiriyor, bilgi paylaşımını ve inovasyonu destekliyoruz.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 18,
-                    height: 1.6,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 40),
-          Expanded(
-            flex: 1,
-            child: Container(
-              height: 600,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: const Color(0xFF1A2332),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop',
-                  ),
-                  fit: BoxFit.cover,
-                ),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _EventsContent(),
+                  const FooterWidget(),
+                ],
               ),
             ),
           ),
@@ -130,10 +29,10 @@ class _HeroSection extends StatelessWidget {
   }
 }
 
-class _EventsSection extends StatelessWidget {
+class _EventsContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
 
-  _EventsSection();
+  _EventsContent();
 
   @override
   Widget build(BuildContext context) {
@@ -197,18 +96,30 @@ class _EventsSection extends StatelessWidget {
 
               final events = snapshot.data!;
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: events.length,
-                itemBuilder: (context, index) {
-                  return _EventCard(events[index]);
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 1200
+                      ? 4
+                      : constraints.maxWidth > 800
+                          ? 3
+                          : constraints.maxWidth > 600
+                              ? 2
+                              : 1;
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      return _EventCard(events[index]);
+                    },
+                  );
                 },
               );
             },
@@ -231,7 +142,7 @@ class _EventCard extends StatelessWidget {
         color: const Color(0xFF1A2332),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -257,7 +168,7 @@ class _EventCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -340,5 +251,4 @@ class _EventInfo extends StatelessWidget {
     );
   }
 }
-
 

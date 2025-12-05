@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pending Admins - herkes kayıt olabilir, authenticated kullanıcılar yönetebilir
+    match /pending_admins/{pendingId} {
+      allow create: if true; // Herkes kayıt olabilir
+      allow read, update, delete: if request.auth != null; // Authenticated kullanıcılar yönetebilir
+    }
+    
+    // Events koleksiyonu - herkes okuyabilir, authenticated kullanıcılar yazabilir
+    match /events/{eventId} {
+      allow read: if true; // Herkes okuyabilir
+      allow write: if request.auth != null; // Authenticated kullanıcılar yazabilir
+    }
+    
+    // Admins - authenticated kullanıcılar okuyabilir/yazabilir
+    match /admins/{adminId} {
+      allow read, write: if request.auth != null; // Authenticated kullanıcılar yönetebilir
+    }
+  }
+}
+

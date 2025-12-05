@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'secrets.dart';
 import 'pages/home_page.dart';
+import 'pages/events_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_register_page.dart';
 import 'pages/admin_verify_page.dart';
+import 'pages/admin_reject_page.dart';
 import 'pages/admin_panel_page.dart';
 
 void main() async {
@@ -43,6 +45,7 @@ class BMTApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const HomePage(),
+        '/events': (context) => const EventsPage(),
         '/admin-login': (context) => const AdminLoginPage(),
         '/admin-register': (context) => const AdminRegisterPage(),
         '/admin-panel': (context) => const AdminPanelPage(),
@@ -50,6 +53,11 @@ class BMTApp extends StatelessWidget {
           final uri = Uri.base;
           final token = uri.queryParameters['token'];
           return AdminVerifyPage(token: token);
+        },
+        '/admin-reject': (context) {
+          final uri = Uri.base;
+          final token = uri.queryParameters['token'];
+          return AdminRejectPage(token: token);
         },
       },
       onGenerateRoute: (settings) {
