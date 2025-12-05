@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import '../widgets/header.dart';
 
 class AdminPanelPage extends StatefulWidget {
   const AdminPanelPage({super.key});
@@ -20,7 +19,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const Header(currentRoute: '/admin'),
+            _Header(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
               child: Column(
@@ -30,7 +29,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Admin Paneli',
+                        'Admin Paneli - İçerik Yönetimi',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 48,
@@ -57,7 +56,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                             onPressed: () async {
                               await _authService.signOut();
                               if (mounted) {
-                                Navigator.pushReplacementNamed(context, '/home');
+                                Navigator.pushReplacementNamed(context, '/');
                               }
                             },
                             icon: const Icon(Icons.logout),
@@ -404,6 +403,64 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
         }
       }
     }
+  }
+}
+
+class _Header extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2332),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2196F3),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: const Icon(
+                  Icons.memory,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'BMT - Admin Paneli',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pushReplacementNamed(context, '/'),
+            icon: const Icon(Icons.home),
+            label: const Text('Ana Sayfaya Dön'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

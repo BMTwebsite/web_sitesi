@@ -1,8 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import '../secrets.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -33,13 +34,31 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // Check if user is admin (you can customize this logic)
-  bool isAdmin() {
+  // Check if user is admin (check in Firestore admins collection)
+  Future<bool> isAdmin() async {
+    final user = currentUser;
+    if (user == null || user.email == null) return false;
+    
+    try {
+      final query = await _firestore
+          .collection('admins')
+          .where('email', isEqualTo: user.email)
+          .limit(1)
+          .get();
+      
+      return query.docs.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  // Synchronous version (for quick checks, may not be accurate)
+  bool isAdminSync() {
     final user = currentUser;
     if (user == null) return false;
-    // For now, we'll check if the email matches admin email
-    // In production, you should use custom claims or Firestore
-    return user.email == Secrets.adminEmail;
+    // For synchronous checks, we can't query Firestore
+    // This is a fallback - use isAdmin() for accurate checks
+    return true; // Assume true if logged in, verify with isAdmin() when needed
   }
 
   String _handleAuthException(FirebaseAuthException e) {

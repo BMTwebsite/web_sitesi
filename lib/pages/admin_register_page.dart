@@ -1,94 +1,114 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/email_service.dart';
 
-class AdminLoginPage extends StatefulWidget {
-  const AdminLoginPage({super.key});
+class AdminRegisterPage extends StatefulWidget {
+  const AdminRegisterPage({super.key});
 
   @override
-  State<AdminLoginPage> createState() => _AdminLoginPageState();
+  State<AdminRegisterPage> createState() => _AdminRegisterPageState();
 }
 
-class _AdminLoginPageState extends State<AdminLoginPage> {
+class _AdminRegisterPageState extends State<AdminRegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
+  final _confirmPasswordController = TextEditingController();
   final _firestoreService = FirestoreService();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+  Future<void> _register() async {
+    print('🔵 Kayıt işlemi başlatılıyor...');
+    
     if (!_formKey.currentState!.validate()) {
+      print('❌ Form validasyonu başarısız');
       return;
     }
+
+    print('✅ Form validasyonu başarılı');
+    print('📧 Email: ${_emailController.text.trim()}');
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Check if admin is verified
-      final isVerified = await _firestoreService.isAdminVerified(
-        _emailController.text.trim(),
-      );
-
-      if (!isVerified) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Hesabınız henüz onaylanmamış. Lütfen e-postanızı kontrol edin ve onay linkine tıklayın.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 5),
-          ),
-        );
-        return;
-      }
-
-      // Sign in
-      await _authService.signInWithEmailAndPassword(
+      print('📝 Firestore\'a kayıt yapılıyor...');
+      // Register pending admin
+      final token = await _firestoreService.registerPendingAdmin(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      print('✅ Firestore kaydı başarılı, token: $token');
+
+      // Create verification link
+      final verificationLink = EmailService.createVerificationLink(token);
+      print('🔗 Verification link oluşturuldu: $verificationLink');
+
+      // Send verification email
+      print('📧 E-posta gönderiliyor...');
+      await EmailService.sendVerificationEmail(
+        toEmail: _emailController.text.trim(),
+        verificationToken: token,
+        verificationLink: verificationLink,
+      );
+      print('✅ E-posta gönderildi');
 
       if (!mounted) return;
 
-      // Check if user is admin
-      final isAdmin = await _authService.isAdmin();
-      if (isAdmin) {
-        Navigator.pushReplacementNamed(context, '/admin');
-      } else {
-        await _authService.signOut();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bu hesap admin yetkisine sahip değil.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
+      // Show success message
+      print('✅ Kayıt işlemi tamamlandı, başarı dialogu gösteriliyor');
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A2332),
+          title: const Text(
+            'Kayıt Başarılı',
+            style: TextStyle(color: Colors.white),
           ),
-        );
-      }
+          content: const Text(
+            'Kayıt işleminiz tamamlandı. Onay isteği gönderildi. '
+            'Hesabınız onaylandıktan sonra giriş yapabileceksiniz.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Go back to login
+              },
+              child: const Text('Tamam', style: TextStyle(color: Color(0xFF2196F3))),
+            ),
+          ],
+        ),
+      );
+    } catch (e, stackTrace) {
+      print('❌ HATA: $e');
+      print('📚 Stack trace: $stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kayıt hatası: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        print('🔄 Loading durumu false olarak ayarlandı');
       }
     }
   }
@@ -129,7 +149,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: const Icon(
-                          Icons.admin_panel_settings,
+                          Icons.person_add,
                           color: Colors.white,
                           size: 32,
                         ),
@@ -138,7 +158,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'Admin Girişi',
+                    'Admin Kayıt',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -148,7 +168,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Yönetim paneline erişmek için giriş yapın',
+                    'Admin hesabı oluşturmak için kayıt olun',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white70,
@@ -236,48 +256,102 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 32),
-                  // Login Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _signIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
+                  const SizedBox(height: 20),
+                  // Confirm Password Field
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Şifre Tekrar',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                          });
+                        },
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF0A1929),
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
                       ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Şifre tekrarı gerekli';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Şifreler eşleşmiyor';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  // Register Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : () {
+                        print('🔘 Kayıt Ol butonuna tıklandı');
+                        _register();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2196F3),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Kayıt Ol',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            'Giriş Yap',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  // Register Link
+                  // Login Link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'Hesabınız yok mu? ',
+                        'Zaten hesabınız var mı? ',
                         style: TextStyle(color: Colors.white70),
                       ),
                       TextButton(
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/admin-register'),
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/admin-login'),
                         child: const Text(
-                          'Kayıt Ol',
+                          'Giriş Yap',
                           style: TextStyle(color: Color(0xFF2196F3)),
                         ),
                       ),
