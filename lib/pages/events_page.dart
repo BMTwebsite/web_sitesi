@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../widgets/header.dart';
-import '../widgets/footer.dart';
 import '../services/firestore_service.dart';
+import '../widgets/header_widget.dart';
+import '../widgets/footer_widget.dart';
 
 class EventsPage extends StatelessWidget {
   const EventsPage({super.key});
@@ -25,6 +25,8 @@ class EventsPage extends StatelessWidget {
 class _EventsContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
 
+  _EventsContent();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -33,6 +35,7 @@ class _EventsContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
+            'Yaklaşan Etkinlikler',
             'Etkinlik Takvimi',
             style: TextStyle(
               color: Colors.white,
@@ -42,6 +45,7 @@ class _EventsContent extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
+            'Yaklaşan etkinliklerimize göz atın',
             'Yaklaşan etkinliklerimize göz atın ve teknoloji dünyasında bir adım öne geçin',
             style: TextStyle(
               color: Colors.white70,
@@ -87,6 +91,30 @@ class _EventsContent extends StatelessWidget {
 
               final events = snapshot.data!;
 
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 1200
+                      ? 4
+                      : constraints.maxWidth > 800
+                          ? 3
+                          : constraints.maxWidth > 600
+                              ? 2
+                              : 1;
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      return _EventCard(events[index]);
+                    },
+                  );
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -121,7 +149,7 @@ class _EventCard extends StatelessWidget {
         color: const Color(0xFF1A2332),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -148,6 +176,7 @@ class _EventCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -187,6 +216,11 @@ class _EventCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
+                  _EventInfo(icon: Icons.calendar_today, text: event.date),
+                  const SizedBox(height: 8),
+                  _EventInfo(icon: Icons.access_time, text: event.time),
+                  const SizedBox(height: 8),
+                  _EventInfo(icon: Icons.location_on, text: event.location),
                   _EventInfo(
                     icon: Icons.calendar_today,
                     text: event.date,

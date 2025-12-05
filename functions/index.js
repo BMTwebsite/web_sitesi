@@ -16,24 +16,41 @@ admin.initializeApp();
 
 // Email gönderme fonksiyonu
 exports.sendVerificationEmail = functions.https.onCall(async (data, context) => {
-  const { to, userEmail, subject, token, link } = data;
+  const { to, userEmail, subject, token, link, rejectLink } = data;
 
   // Email transporter oluştur (Gmail örneği)
-  // Not: Gmail için "Daha az güvenli uygulama erişimi" açık olmalı
-  // veya OAuth2 kullanmalısınız
+  // Spam'a gitmemesi için doğru ayarlar
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // veya başka bir servis (SendGrid, Mailgun, vb.)
+    service: 'gmail',
     auth: {
-      user: 'your-email@gmail.com', // BMT email adresiniz
-      pass: 'your-app-password', // Gmail App Password
+      user: 'bmtbanu@gmail.com', // BMT email adresiniz
+      pass: process.env.GMAIL_APP_PASSWORD || 'YOUR_APP_PASSWORD', // Gmail App Password (environment variable kullanın)
     },
+    // Spam'a gitmemesi için ek ayarlar
+    tls: {
+      rejectUnauthorized: false
+    },
+    // Rate limiting
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 3,
   });
 
-  // Email içeriği
+  // Email içeriği - Spam'a gitmemesi için optimize edilmiş
   const mailOptions = {
-    from: '"BMT Web Sitesi" <your-email@gmail.com>', // Gönderen adı ve email
+    from: '"BMT Web Sitesi" <bmtbanu@gmail.com>', // Gönderen adı ve email
     to: to,
-    subject: subject || 'BMT Web Sitesi Onay Maili',
+    replyTo: 'bmtbanu@gmail.com', // Yanıt adresi
+    subject: subject || 'BMT Web Sitesi - Admin Hesabı Onay İsteği',
+    // Spam'a gitmemesi için headers
+    headers: {
+      'X-Priority': '1',
+      'X-MSMail-Priority': 'High',
+      'Importance': 'high',
+      'List-Unsubscribe': '<mailto:bmtbanu@gmail.com>',
+    },
+    // Email önceliği
+    priority: 'high',
     html: `
       <!DOCTYPE html>
       <html>
@@ -82,17 +99,18 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
           <h1>BMT Web Sitesi</h1>
         </div>
         <div class="content">
-          <h2>Admin Hesabı Onayı</h2>
+          <h2>Admin Hesabı Onay İsteği</h2>
           <p>Merhaba,</p>
           <p><strong>${userEmail || 'Bir kullanıcı'}</strong> e-posta adresi ile BMT Web Sitesi için admin hesabı oluşturma talebi alınmıştır.</p>
-          <p>Hesabı aktifleştirmek için aşağıdaki butona tıklayın:</p>
-          <p style="text-align: center;">
-            <a href="${link}" class="button">Hesabı Onayla</a>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${link}" class="button" style="text-decoration: none; background-color: #4CAF50; margin-right: 10px;">✅ Onayla</a>
+            <a href="${rejectLink}" class="button" style="text-decoration: none; background-color: #F44336; margin-left: 10px;">❌ Reddet</a>
           </p>
-          <p>Veya aşağıdaki linki tarayıcınıza yapıştırın:</p>
-          <p style="word-break: break-all; color: #2196F3;">${link}</p>
-          <p>Bu link 24 saat geçerlidir.</p>
-          <p>Eğer bu işlemi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 20px;">Onaylamak için yeşil butona, reddetmek için kırmızı butona tıklayın.</p>
+          <p style="color: #666; font-size: 12px;">Veya aşağıdaki linkleri kullanabilirsiniz:</p>
+          <p style="word-break: break-all; color: #2196F3; font-size: 11px; margin: 5px 0;"><strong>Onay:</strong> ${link}</p>
+          <p style="word-break: break-all; color: #F44336; font-size: 11px; margin: 5px 0;"><strong>Red:</strong> ${rejectLink}</p>
+          <p style="color: #666; font-size: 12px; margin-top: 15px;">Bu linkler 24 saat geçerlidir.</p>
         </div>
         <div class="footer">
           <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayın.</p>

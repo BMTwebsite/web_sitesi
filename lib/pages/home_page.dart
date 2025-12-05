@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
+import '../widgets/header_widget.dart';
+import '../widgets/footer_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -10,18 +11,16 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _eventsKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _Header(eventsKey: _eventsKey),
+            const HeaderWidget(),
             _HeroSection(),
-            _EventsSection(key: _eventsKey),
-            _Footer(),
+            _EventsSection(),
+            const FooterWidget(),
           ],
         ),
       ),
@@ -408,7 +407,7 @@ class _HeroSection extends StatelessWidget {
 class _EventsSection extends StatelessWidget {
   final _firestoreService = FirestoreService();
 
-  _EventsSection({super.key});
+  _EventsSection();
 
   @override
   Widget build(BuildContext context) {
@@ -616,24 +615,4 @@ class _EventInfo extends StatelessWidget {
   }
 }
 
-class _Footer extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 50),
-      color: const Color(0xFF0A1929),
-      child: Column(
-        children: [
-          const Text(
-            '© 2025 Bilgisayar Mühendisliği Topluluğu. Tüm hakları saklıdır.',
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 

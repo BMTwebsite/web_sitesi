@@ -126,18 +126,26 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
         'verified': false,
       }).timeout(
-        const Duration(seconds: 20),
+        const Duration(seconds: 30), // Timeout süresini artırdık
         onTimeout: () {
-          print('⏱️ Firestore yazma işlemi timeout oldu');
+          print('⏱️ Firestore yazma işlemi timeout oldu (30 saniye)');
           print('💡 Muhtemel nedenler:');
           print('   1. Firestore Security Rules yazma izni vermiyor');
           print('   2. İnternet bağlantısı sorunu');
           print('   3. Firebase proje ayarları');
           throw 'Kayıt işlemi zaman aşımına uğradı.\n\n'
-              'Lütfen şunları kontrol edin:\n'
-              '1. Firebase Console > Firestore Database > Rules\n'
-              '2. pending_admins koleksiyonu için yazma izni verilmiş olmalı\n'
-              '3. İnternet bağlantınızı kontrol edin';
+              '🔧 ÇÖZÜM:\n'
+              '1. Firebase Console\'a gidin: https://console.firebase.google.com/\n'
+              '2. Projenizi seçin: bmt-web-41790\n'
+              '3. Firestore Database > Rules sekmesine gidin\n'
+              '4. Şu kuralı ekleyin:\n\n'
+              'match /pending_admins/{pendingId} {\n'
+              '  allow create: if true;\n'
+              '  allow read, update, delete: if request.auth != null;\n'
+              '}\n\n'
+              '5. Publish butonuna tıklayın\n'
+              '6. Uygulamayı yeniden başlatın\n\n'
+              '📖 Detaylı rehber: FIREBASE_RULES_FIX.md dosyasına bakın';
         },
       );
 
