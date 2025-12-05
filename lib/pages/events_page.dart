@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/header.dart';
+import '../widgets/footer.dart';
 import '../services/firestore_service.dart';
-import '../widgets/header_widget.dart';
-import '../widgets/footer_widget.dart';
 
 class EventsPage extends StatelessWidget {
   const EventsPage({super.key});
@@ -12,9 +12,9 @@ class EventsPage extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            const HeaderWidget(),
+            const Header(currentRoute: '/events'),
             _EventsContent(),
-            const FooterWidget(),
+            const Footer(),
           ],
         ),
       ),
@@ -24,8 +24,6 @@ class EventsPage extends StatelessWidget {
 
 class _EventsContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
-
-  _EventsContent();
 
   @override
   Widget build(BuildContext context) {
@@ -89,30 +87,18 @@ class _EventsContent extends StatelessWidget {
 
               final events = snapshot.data!;
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth > 1200
-                      ? 4
-                      : constraints.maxWidth > 800
-                          ? 3
-                          : constraints.maxWidth > 600
-                              ? 2
-                              : 1;
-
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 20,
-                      mainAxisSpacing: 20,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: events.length,
-                    itemBuilder: (context, index) {
-                      return _EventCard(events[index]);
-                    },
-                  );
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  return _EventCard(events[index]);
                 },
               );
             },
@@ -201,11 +187,20 @@ class _EventCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
-                  _EventInfo(icon: Icons.calendar_today, text: event.date),
+                  _EventInfo(
+                    icon: Icons.calendar_today,
+                    text: event.date,
+                  ),
                   const SizedBox(height: 8),
-                  _EventInfo(icon: Icons.access_time, text: event.time),
+                  _EventInfo(
+                    icon: Icons.access_time,
+                    text: event.time,
+                  ),
                   const SizedBox(height: 8),
-                  _EventInfo(icon: Icons.location_on, text: event.location),
+                  _EventInfo(
+                    icon: Icons.location_on,
+                    text: event.location,
+                  ),
                   const Spacer(),
                   _EventInfo(
                     icon: Icons.people,
