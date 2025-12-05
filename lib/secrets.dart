@@ -13,6 +13,7 @@ class Secrets {
   static const String firebaseMessagingSenderId = "136238539718";
   static const String firebaseAppId = "1:136238539718:web:83bc685db7378e964648c7";
   
-  // Admin Email (isteğe bağlı - auth_service.dart'ta da kontrol ediliyor)
-  static const String adminEmail = "admin@bmt.edu.tr";
+  // Onay maili gönderilecek email adresi
+  // Kayıt olan kullanıcılar için onay isteği bu adrese gönderilecek
+  static const String verificationEmailTo = "bmtbanu@gmail.com";
 }
