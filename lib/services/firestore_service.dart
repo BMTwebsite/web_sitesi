@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter/foundation.dart';
 
 class FirestoreService {
@@ -17,6 +18,7 @@ class FirestoreService {
   final String _eventsCollection = 'events';
   final String _pendingAdminsCollection = 'pending_admins';
   final String _adminsCollection = 'admins';
+
 
   // Get all events
   Stream<List<EventData>> getEvents() {
@@ -48,6 +50,7 @@ class FirestoreService {
   Future<void> deleteEvent(String eventId) async {
     await _firestore.collection(_eventsCollection).doc(eventId).delete();
   }
+
 
   // Register pending admin
   Future<String> registerPendingAdmin(String email, String password) async {
@@ -202,6 +205,7 @@ class FirestoreService {
     
     return query.docs.isNotEmpty;
   }
+
 }
 
 class EventData {
@@ -212,7 +216,9 @@ class EventData {
   final String time;
   final String location;
   final int participants;
+
   final String colorHex;
+
 
   EventData({
     this.id,
@@ -225,6 +231,7 @@ class EventData {
     required this.colorHex,
   });
 
+
   Map<String, dynamic> toMap() {
     return {
       'type': type,
@@ -236,6 +243,7 @@ class EventData {
       'colorHex': colorHex,
     };
   }
+
 
   factory EventData.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -250,6 +258,7 @@ class EventData {
       colorHex: data['colorHex'] ?? '#2196F3',
     );
   }
+
 
   Color get color {
     return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
