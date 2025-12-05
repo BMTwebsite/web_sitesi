@@ -51,11 +51,9 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
       );
       print('✅ Firestore kaydı başarılı, token: $token');
 
-      // Create verification and reject links
+      // Create verification link
       final verificationLink = EmailService.createVerificationLink(token);
-      final rejectLink = EmailService.createRejectLink(token);
       print('🔗 Verification link oluşturuldu: $verificationLink');
-      print('🔴 Reject link oluşturuldu: $rejectLink');
 
       // Send verification email
       print('📧 E-posta gönderiliyor...');
@@ -63,13 +61,12 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
         toEmail: _emailController.text.trim(),
         verificationToken: token,
         verificationLink: verificationLink,
-        rejectLink: rejectLink,
       );
       print('✅ E-posta gönderildi');
 
       if (!mounted) return;
 
-      // Show success message with verification link
+      // Show success message
       print('✅ Kayıt işlemi tamamlandı, başarı dialogu gösteriliyor');
       showDialog(
         context: context,
@@ -79,52 +76,10 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
             'Kayıt Başarılı',
             style: TextStyle(color: Colors.white),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Kayıt işleminiz tamamlandı. Onay isteği gönderildi. '
-                  'Hesabınız onaylandıktan sonra giriş yapabileceksiniz.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Onay Linki (Email gelmediyse bu linki kullanın):',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A1929),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: SelectableText(
-                    verificationLink,
-                    style: const TextStyle(
-                      color: Color(0xFF2196F3),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Not: Email göndermek için Firebase Cloud Functions kurulumu gereklidir. '
-                  'Detaylar için QUICK_EMAIL_SETUP.md dosyasına bakın.',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+          content: const Text(
+            'Kayıt işleminiz tamamlandı. Onay isteği gönderildi. '
+            'Hesabınız onaylandıktan sonra giriş yapabileceksiniz.',
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
@@ -141,122 +96,13 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
       print('❌ HATA: $e');
       print('📚 Stack trace: $stackTrace');
       if (!mounted) return;
-      
-      // Timeout hatası için özel dialog
-      final errorMessage = e.toString();
-      if (errorMessage.contains('zaman aşımı') || errorMessage.contains('timeout')) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF1A2332),
-            title: const Row(
-              children: [
-                Icon(Icons.error, color: Colors.red, size: 28),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Firestore Bağlantı Hatası',
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Firestore Security Rules yazma izni vermiyor.',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Çözüm:',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _StepWidget('1', 'Firebase Console\'a gidin: console.firebase.google.com'),
-                  _StepWidget('2', 'Projenizi seçin: bmt-web-41790'),
-                  _StepWidget('3', 'Firestore Database > Rules sekmesine gidin'),
-                  _StepWidget('4', 'TÜM mevcut kuralları silin (Ctrl+A, Delete)'),
-                  _StepWidget('5', 'Aşağıdaki kuralları yapıştırın:'),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1929),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const SelectableText(
-                      'rules_version = \'2\';\n'
-                      'service cloud.firestore {\n'
-                      '  match /databases/{database}/documents {\n'
-                      '    match /pending_admins/{document=**} {\n'
-                      '      allow read, write: if true;\n'
-                      '    }\n'
-                      '    match /events/{document=**} {\n'
-                      '      allow read, write: if true;\n'
-                      '    }\n'
-                      '    match /admins/{document=**} {\n'
-                      '      allow read, write: if true;\n'
-                      '    }\n'
-                      '  }\n'
-                      '}',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _StepWidget('6', 'Publish butonuna tıklayın (sağ üstte)'),
-                  _StepWidget('7', '10-30 saniye bekleyin (rules yayınlanıyor)'),
-                  _StepWidget('8', 'Uygulamayı yeniden başlatın (R tuşu)'),
-                  const SizedBox(height: 20),
-                  const Divider(color: Colors.white24),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '💡 Alternatif: Test Mode (Daha Kolay)',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Firebase Console > Firestore Database > Overview\'da "Test mode" seçeneğini kullanabilirsiniz. Bu 30 gün boyunca herkesin yazmasına izin verir ve rules ayarlamaya gerek kalmaz.',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Tamam', style: TextStyle(color: Color(0xFF2196F3))),
-              ),
-            ],
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Kayıt hatası: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kayıt hatası: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -516,54 +362,6 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// Helper widget for step display
-class _StepWidget extends StatelessWidget {
-  final String number;
-  final String text;
-
-  const _StepWidget(this.number, this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2196F3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
