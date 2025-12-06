@@ -197,6 +197,42 @@ class FirestoreService {
     return {'email': email, 'password': password};
   }
 
+  // Reject admin by token (delete from pending_admins)
+  Future<void> rejectAdmin(String token) async {
+    final query = await _firestore
+        .collection(_pendingAdminsCollection)
+        .where('token', isEqualTo: token)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) {
+      throw 'Geçersiz veya kullanılmış red linki.';
+    }
+
+    final doc = query.docs.first;
+    await doc.reference.delete();
+  }
+
+  // Delete all pending admin registrations
+  Future<int> deleteAllPendingAdmins() async {
+    try {
+      final query = await _firestore
+          .collection(_pendingAdminsCollection)
+          .get();
+      
+      int deletedCount = 0;
+      for (var doc in query.docs) {
+        await doc.reference.delete();
+        deletedCount++;
+      }
+      
+      return deletedCount;
+    } catch (e) {
+      print('❌ Tüm bekleyen admin kayıtlarını silme hatası: $e');
+      rethrow;
+    }
+  }
+
   // Check if admin is verified
   Future<bool> isAdminVerified(String email) async {
     final query = await _firestore

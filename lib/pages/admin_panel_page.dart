@@ -38,23 +38,41 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          await _authService.signOut();
-                          if (mounted) {
-                            Navigator.pushReplacementNamed(context, '/');
-                          }
-                        },
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Çıkış Yap'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white54),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _clearPendingAdmins(context),
+                            icon: const Icon(Icons.delete_sweep),
+                            label: const Text('Eski Onay Taleplerini Temizle'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange,
+                              side: const BorderSide(color: Colors.orange),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              await _authService.signOut();
+                              if (mounted) {
+                                Navigator.pushReplacementNamed(context, '/');
+                              }
+                            },
+                            icon: const Icon(Icons.logout),
+                            label: const Text('Çıkış Yap'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -400,6 +418,109 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _clearPendingAdmins(BuildContext context) async {
+    // Onay dialogu göster
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2332),
+        title: const Text(
+          'Eski Onay Taleplerini Temizle',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Tüm bekleyen admin onay taleplerini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Temizle'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Loading dialogu göster
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final deletedCount = await _firestoreService.deleteAllPendingAdmins();
+      
+      if (!context.mounted) return;
+      Navigator.pop(context); // Loading dialogunu kapat
+      
+      // Başarı dialogu göster
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A2332),
+          title: const Text(
+            'Başarılı',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            '$deletedCount adet bekleyen onay talebi silindi.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+              ),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // Loading dialogunu kapat
+      
+      // Hata dialogu göster
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A2332),
+          title: const Text(
+            'Hata',
+            style: TextStyle(color: Colors.red),
+          ),
+          content: Text(
+            'Onay talepleri temizlenirken bir hata oluştu: ${e.toString()}',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+              ),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _deleteEvent(String eventId) async {

@@ -15,5 +15,5 @@ class Secrets {
   
   // Onay maili gönderilecek email adresi
   // Kayıt olan kullanıcılar için onay isteği bu adrese gönderilecek
-  static const String verificationEmailTo = "bmtbanu@gmail.com";
+  static const String verificationEmailTo = "shylmlk2004@gmail.com";
 }

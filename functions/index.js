@@ -24,15 +24,16 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
   const transporter = nodemailer.createTransport({
     service: 'gmail', // veya başka bir servis (SendGrid, Mailgun, vb.)
     auth: {
-      user: 'your-email@gmail.com', // BMT email adresiniz
-      pass: 'your-app-password', // Gmail App Password
+      user: 'shylmlk2004@gmail.com', // BMT email adresiniz
+      pass: process.env.GMAIL_APP_PASSWORD || 'YOUR_APP_PASSWORD', // Gmail App Password
     },
   });
 
   // Email içeriği
   const mailOptions = {
-    from: '"BMT Web Sitesi" <your-email@gmail.com>', // Gönderen adı ve email
+    from: '"BMT Web Sitesi" <shylmlk2004@gmail.com>', // Gönderen adı ve email
     to: to,
+    replyTo: 'shylmlk2004@gmail.com',
     subject: subject || 'BMT Web Sitesi Onay Maili',
     html: `
       <!DOCTYPE html>
