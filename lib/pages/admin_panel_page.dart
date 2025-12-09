@@ -421,37 +421,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
   }
 
   Future<void> _clearPendingAdmins(BuildContext context) async {
-    // Onay dialogu göster
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2332),
-        title: const Text(
-          'Eski Onay Taleplerini Temizle',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Tüm bekleyen admin onay taleplerini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('İptal', style: TextStyle(color: Colors.white70)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-            ),
-            child: const Text('Temizle'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
     // Loading dialogu göster
     if (!context.mounted) return;
     showDialog(

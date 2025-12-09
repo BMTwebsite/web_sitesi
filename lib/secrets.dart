@@ -15,5 +15,11 @@ class Secrets {
   
   // Onay maili gönderilecek email adresi
   // Kayıt olan kullanıcılar için onay isteği bu adrese gönderilecek
-  static const String verificationEmailTo = "shylmlk2004@gmail.com";
+  static const String verificationEmailTo = "suheyla0403@gmail.com";
+  
+  // Gmail App Password - E-posta göndermek için kullanılır
+  // Gmail App Password oluşturma: https://myaccount.google.com/apppasswords
+  // NOT: Bu değer functions/.env dosyasına da eklenmelidir
+  // Production için: firebase functions:secrets:set GMAIL_APP_PASSWORD
+  static const String gmailAppPassword = "YOUR_GMAIL_APP_PASSWORD_HERE";
 }

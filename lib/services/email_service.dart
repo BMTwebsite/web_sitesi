@@ -1,12 +1,9 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import '../secrets.dart';
 
 class EmailService {
-  // Bu servis Firebase Cloud Functions veya başka bir email servisi ile entegre edilebilir
-  // Şimdilik basit bir HTTP endpoint kullanıyoruz
-  
   // Email gönderme fonksiyonu
-  // Not: Bu fonksiyon bir backend servisi gerektirir
-  // Firebase Cloud Functions kullanarak email gönderebilirsiniz
+  // Firebase Cloud Functions kullanarak email gönderir
   
   static Future<void> sendVerificationEmail({
     required String toEmail, // Kullanıcının email'i (bilgi amaçlı)
@@ -16,39 +13,33 @@ class EmailService {
     // Onay maili secrets.dart'taki verificationEmailTo adresine gönderilecek
     final verificationEmailAddress = Secrets.verificationEmailTo;
     
-    // Firebase Cloud Functions endpoint'i
-    // Not: Firebase Cloud Functions'ı deploy ettikten sonra bu URL'yi güncelleyin
-    // Örnek: https://us-central1-bmt-web-41790.cloudfunctions.net/sendVerificationEmail
-    // final url = 'https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/sendVerificationEmail';
-    
     try {
+      print('📧 E-posta gönderiliyor...');
+      print('📬 Alıcı: $verificationEmailAddress');
+      print('👤 Kullanıcı: $toEmail');
+      print('🔗 Onay linki: $verificationLink');
+      
       // Firebase Cloud Functions'ı çağır
-      // Not: Bu kısım için firebase_functions paketi gerekebilir
-      // Alternatif olarak HTTP callable function kullanabilirsiniz
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('sendVerificationEmail');
       
-      // Şimdilik sadece log yazdırıyoruz
-      // Gerçek uygulamada Firebase Cloud Functions'ı deploy edip burayı aktifleştirin
-      print('📧 Verification email would be sent to: $verificationEmailAddress');
-      print('👤 User email: $toEmail');
-      print('🔗 Verification link: $verificationLink');
-      print('⚠️  Note: Email göndermek için Firebase Cloud Functions deploy edilmelidir.');
-      print('📝 See functions/index.js for Cloud Functions code.');
+      final result = await callable.call({
+        'to': verificationEmailAddress, // Onay maili bu adrese gidecek
+        'userEmail': toEmail, // Kullanıcının email'i (email içeriğinde gösterilecek)
+        'subject': 'BMT Web Sitesi Onay Maili',
+        'token': verificationToken,
+        'link': verificationLink,
+      });
       
-      // TODO: Firebase Cloud Functions deploy edildikten sonra bu kodu aktifleştirin
-      // final functions = FirebaseFunctions.instance;
-      // final callable = functions.httpsCallable('sendVerificationEmail');
-      // await callable.call({
-      //   'to': verificationEmailAddress, // Onay maili bu adrese gidecek
-      //   'userEmail': toEmail, // Kullanıcının email'i (email içeriğinde gösterilecek)
-      //   'subject': 'BMT Web Sitesi Onay Maili',
-      //   'token': verificationToken,
-      //   'link': verificationLink,
-      // });
+      print('✅ E-posta gönderme sonucu: ${result.data}');
+      
+      if (result.data['success'] != true) {
+        throw 'E-posta gönderilemedi. Lütfen daha sonra tekrar deneyin.';
+      }
     } catch (e) {
-      // Email gönderilemese bile devam et (geliştirme aşamasında)
-      print('⚠️  Email gönderme hatası (geliştirme modu): $e');
-      // Production'da bu hatayı throw edin:
-      // throw 'Email gönderilirken hata oluştu: $e';
+      print('❌ E-posta gönderme hatası: $e');
+      // Hata mesajını kullanıcıya göster
+      throw 'E-posta gönderilirken hata oluştu: ${e.toString()}';
     }
   }
 

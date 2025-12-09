@@ -220,13 +220,36 @@ class FirestoreService {
           .collection(_pendingAdminsCollection)
           .get();
       
+      if (query.docs.isEmpty) {
+        return 0;
+      }
+      
+      // Batch delete kullan (Firestore'da batch işlemler maksimum 500 doküman)
       int deletedCount = 0;
-      for (var doc in query.docs) {
-        await doc.reference.delete();
-        deletedCount++;
+      const int batchLimit = 500;
+      
+      for (int i = 0; i < query.docs.length; i += batchLimit) {
+        final batch = _firestore.batch();
+        final end = (i + batchLimit < query.docs.length) 
+            ? i + batchLimit 
+            : query.docs.length;
+        
+        for (int j = i; j < end; j++) {
+          batch.delete(query.docs[j].reference);
+          deletedCount++;
+        }
+        
+        await batch.commit();
       }
       
       return deletedCount;
+    } on FirebaseException catch (e) {
+      print('❌ Firebase hatası: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase konsolunda Firestore Security Rules\'ı kontrol edin:\n\n'
+            'pending_admins koleksiyonu için silme izni verilmelidir.';
+      }
+      rethrow;
     } catch (e) {
       print('❌ Tüm bekleyen admin kayıtlarını silme hatası: $e');
       rethrow;
