@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'secrets.dart';
 import 'pages/home_page.dart';
@@ -12,16 +14,40 @@ import 'pages/admin_panel_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: FirebaseOptions(
-      apiKey: Secrets.firebaseApiKey,
-      authDomain: Secrets.firebaseAuthDomain,
-      projectId: Secrets.firebaseProjectId,
-      storageBucket: Secrets.firebaseStorageBucket,
-      messagingSenderId: Secrets.firebaseMessagingSenderId,
-      appId: Secrets.firebaseAppId,
-    ),
-  );
+  
+  // Global hata yakalama
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    print('❌ Flutter Error: ${details.exception}');
+    print('📚 Stack: ${details.stack}');
+  };
+  
+  // Platform hatalarını yakala
+  PlatformDispatcher.instance.onError = (error, stack) {
+    print('❌ Platform Error: $error');
+    print('📚 Stack: $stack');
+    return true;
+  };
+  
+  try {
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: Secrets.firebaseApiKey,
+        authDomain: Secrets.firebaseAuthDomain,
+        projectId: Secrets.firebaseProjectId,
+        storageBucket: Secrets.firebaseStorageBucket,
+        messagingSenderId: Secrets.firebaseMessagingSenderId,
+        appId: Secrets.firebaseAppId,
+      ),
+    );
+    print('✅ Firebase başlatıldı');
+  } catch (e, stackTrace) {
+    print('❌ Firebase başlatma hatası: $e');
+    print('📚 Stack trace: $stackTrace');
+    // Hata olsa bile uygulamayı çalıştırmaya devam et
+    // Kullanıcıya hata mesajı gösterilecek
+  }
+  
   runApp(const BMTApp());
 }
 

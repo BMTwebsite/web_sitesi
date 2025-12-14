@@ -92,9 +92,14 @@ class FirestoreService {
             },
           );
       
+      // Eğer bekleyen kayıt varsa, eski kaydı sil
       if (existingPending.docs.isNotEmpty) {
-        print('❌ Bu e-posta için zaten bekleyen bir kayıt var');
-        throw 'Bu e-posta adresi için zaten bir onay talebi mevcut. Lütfen e-postanızı kontrol edin.';
+        print('⚠️ Bu e-posta için bekleyen bir kayıt var, eski kayıt siliniyor...');
+        for (var doc in existingPending.docs) {
+          await doc.reference.delete();
+          print('🗑️ Eski kayıt silindi: ${doc.id}');
+        }
+        print('✅ Eski kayıtlar temizlendi, yeni kayıt oluşturuluyor...');
       }
 
       print('🔑 Token oluşturuluyor...');
