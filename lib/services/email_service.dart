@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../secrets.dart';
 
@@ -21,7 +22,12 @@ class EmailService {
       
       // Firebase Cloud Functions'ı çağır
       final functions = FirebaseFunctions.instance;
-      final callable = functions.httpsCallable('sendVerificationEmail');
+      final callable = functions.httpsCallable(
+        'sendVerificationEmail',
+        options: HttpsCallableOptions(
+          timeout: const Duration(seconds: 30), // 30 saniye timeout
+        ),
+      );
       
       final result = await callable.call({
         'to': verificationEmailAddress, // Onay maili bu adrese gidecek
@@ -29,7 +35,12 @@ class EmailService {
         'subject': 'BMT Web Sitesi Onay Maili',
         'token': verificationToken,
         'link': verificationLink,
-      });
+      }).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw 'E-posta gönderme işlemi zaman aşımına uğradı. Lütfen daha sonra tekrar deneyin.';
+        },
+      );
       
       print('✅ E-posta gönderme sonucu: ${result.data}');
       

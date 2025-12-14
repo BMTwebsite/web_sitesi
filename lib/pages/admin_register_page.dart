@@ -55,14 +55,23 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
       final verificationLink = EmailService.createVerificationLink(token);
       print('🔗 Verification link oluşturuldu: $verificationLink');
 
-      // Send verification email
-      print('📧 E-posta gönderiliyor...');
-      await EmailService.sendVerificationEmail(
-        toEmail: _emailController.text.trim(),
-        verificationToken: token,
-        verificationLink: verificationLink,
-      );
-      print('✅ E-posta gönderildi');
+      // Send verification email (hata olsa bile kayıt başarılı sayılır)
+      bool emailSent = false;
+      String? emailError;
+      try {
+        print('📧 E-posta gönderiliyor...');
+        await EmailService.sendVerificationEmail(
+          toEmail: _emailController.text.trim(),
+          verificationToken: token,
+          verificationLink: verificationLink,
+        );
+        print('✅ E-posta gönderildi');
+        emailSent = true;
+      } catch (emailErr) {
+        print('⚠️ E-posta gönderilemedi: $emailErr');
+        emailError = emailErr.toString();
+        // Email gönderilemese bile kayıt başarılı sayılır
+      }
 
       if (!mounted) return;
 
@@ -76,10 +85,14 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
             'Kayıt Başarılı',
             style: TextStyle(color: Colors.white),
           ),
-          content: const Text(
-            'Kayıt işleminiz tamamlandı. Onay isteği gönderildi. '
-            'Hesabınız onaylandıktan sonra giriş yapabileceksiniz.',
-            style: TextStyle(color: Colors.white70),
+          content: Text(
+            emailSent
+                ? 'Kayıt işleminiz tamamlandı. Onay isteği gönderildi. '
+                    'Hesabınız onaylandıktan sonra giriş yapabileceksiniz.'
+                : 'Kayıt işleminiz tamamlandı. Ancak onay e-postası gönderilemedi. '
+                    'Lütfen admin panelinden manuel olarak onaylanmasını isteyin.\n\n'
+                    'Hata: ${emailError ?? "Bilinmeyen hata"}',
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
