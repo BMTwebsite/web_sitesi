@@ -176,32 +176,60 @@ class FirestoreService {
 
   // Verify admin by token
   Future<Map<String, String>> verifyAdmin(String token) async {
-    final query = await _firestore
-        .collection(_pendingAdminsCollection)
-        .where('token', isEqualTo: token)
-        .where('verified', isEqualTo: false)
-        .limit(1)
-        .get();
+    try {
+      final query = await _firestore
+          .collection(_pendingAdminsCollection)
+          .where('token', isEqualTo: token)
+          .where('verified', isEqualTo: false)
+          .limit(1)
+          .get();
 
-    if (query.docs.isEmpty) {
-      throw 'Geçersiz veya kullanılmış onay linki.';
+      if (query.docs.isEmpty) {
+        throw 'Geçersiz veya kullanılmış onay linki.';
+      }
+
+      final doc = query.docs.first;
+      final data = doc.data();
+      final email = data['email'] as String;
+      final password = data['password'] as String;
+
+      // Check if admin already exists in admins collection
+      final existingAdminQuery = await _firestore
+          .collection(_adminsCollection)
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      // If admin doesn't exist in admins collection, add it
+      if (existingAdminQuery.docs.isEmpty) {
+        // Use batch to ensure both operations succeed or fail together
+        final batch = _firestore.batch();
+        
+        // Mark as verified in pending_admins
+        batch.update(doc.reference, {'verified': true});
+        
+        // Add to admins collection
+        final adminRef = _firestore.collection(_adminsCollection).doc();
+        batch.set(adminRef, {
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        
+        // Commit batch transaction
+        await batch.commit();
+        
+        print('✅ Admin başarıyla onaylandı ve admins koleksiyonuna eklendi: $email');
+      } else {
+        // Admin already exists, just mark as verified
+        await doc.reference.update({'verified': true});
+        print('✅ Admin zaten admins koleksiyonunda, sadece verified işaretlendi: $email');
+      }
+
+      return {'email': email, 'password': password};
+    } catch (e) {
+      print('❌ verifyAdmin hatası: $e');
+      rethrow;
     }
-
-    final doc = query.docs.first;
-    final data = doc.data();
-    final email = data['email'] as String;
-    final password = data['password'] as String;
-
-    // Mark as verified
-    await doc.reference.update({'verified': true});
-
-    // Move to admins collection
-    await _firestore.collection(_adminsCollection).add({
-      'email': email,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    return {'email': email, 'password': password};
   }
 
   // Reject admin by token (delete from pending_admins)
@@ -265,13 +293,48 @@ class FirestoreService {
 
   // Check if admin is verified
   Future<bool> isAdminVerified(String email) async {
-    final query = await _firestore
-        .collection(_adminsCollection)
-        .where('email', isEqualTo: email)
-        .limit(1)
-        .get();
-    
-    return query.docs.isNotEmpty;
+    try {
+      // Force server fetch to avoid cache issues
+      final query = await _firestore
+          .collection(_adminsCollection)
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+      
+      if (query.docs.isNotEmpty) {
+        print('🔍 Admin onay durumu kontrolü: $email -> Onaylı (admins koleksiyonunda)');
+        return true;
+      }
+      
+      // If not in admins, check if verified in pending_admins (recovery for partial failures)
+      final pendingQuery = await _firestore
+          .collection(_pendingAdminsCollection)
+          .where('email', isEqualTo: email)
+          .where('verified', isEqualTo: true)
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
+      
+      if (pendingQuery.docs.isNotEmpty) {
+        // Admin is verified but not in admins collection - fix it
+        print('⚠️ Admin onaylı ama admins koleksiyonunda yok, düzeltiliyor: $email');
+        
+        // Add to admins collection
+        await _firestore.collection(_adminsCollection).add({
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        
+        print('✅ Admin admins koleksiyonuna eklendi: $email');
+        return true;
+      }
+      
+      print('🔍 Admin onay durumu kontrolü: $email -> Onaylanmamış');
+      return false;
+    } catch (e) {
+      print('❌ isAdminVerified hatası: $e');
+      // On error, return false to be safe
+      return false;
+    }
   }
 
   // Get contact settings

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'secrets.dart';
+import 'dart:html' as html show window;
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
 import 'pages/contact_page.dart';
@@ -29,7 +30,10 @@ void main() async {
     return true;
   };
   
+  bool firebaseInitialized = false;
+  
   try {
+    print('🔄 Firebase başlatılıyor...');
     await Firebase.initializeApp(
       options: FirebaseOptions(
         apiKey: Secrets.firebaseApiKey,
@@ -39,23 +43,102 @@ void main() async {
         messagingSenderId: Secrets.firebaseMessagingSenderId,
         appId: Secrets.firebaseAppId,
       ),
+    ).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        print('⏱️ Firebase başlatma timeout oldu');
+        throw 'Firebase başlatma zaman aşımına uğradı';
+      },
     );
+    firebaseInitialized = true;
     print('✅ Firebase başlatıldı');
   } catch (e, stackTrace) {
     print('❌ Firebase başlatma hatası: $e');
     print('📚 Stack trace: $stackTrace');
+    firebaseInitialized = false;
     // Hata olsa bile uygulamayı çalıştırmaya devam et
-    // Kullanıcıya hata mesajı gösterilecek
   }
   
-  runApp(const BMTApp());
+  runApp(BMTApp(firebaseInitialized: firebaseInitialized));
 }
 
 class BMTApp extends StatelessWidget {
-  const BMTApp({super.key});
+  final bool firebaseInitialized;
+  
+  const BMTApp({super.key, this.firebaseInitialized = true});
 
   @override
   Widget build(BuildContext context) {
+    // Firebase başlatılmadıysa hata göster
+    if (!firebaseInitialized) {
+      return MaterialApp(
+        title: 'BMT Web Sitesi',
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: const Color(0xFF0A1929),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Firebase Bağlantı Hatası',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Firebase başlatılamadı. Lütfen:\n'
+                    '1. İnternet bağlantınızı kontrol edin\n'
+                    '2. Tarayıcı konsolunu açın (F12) ve hataları kontrol edin\n'
+                    '3. lib/secrets.dart dosyasının doğru olduğundan emin olun',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Sayfayı yenile
+                      if (kIsWeb) {
+                        // Web için
+                        // ignore: avoid_web_libraries_in_flutter
+                        // dart:html kullanmadan window.location.reload() yapamayız
+                        // Kullanıcıya manuel yenileme söyleyelim
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2196F3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                    child: const Text(
+                      'Sayfayı Yenile',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
     return MaterialApp(
       title: 'BMT Web Sitesi',
       debugShowCheckedModeBanner: false,
@@ -80,8 +163,35 @@ class BMTApp extends StatelessWidget {
         '/admin-register': (context) => const AdminRegisterPage(),
         '/admin-panel': (context) => const AdminPanelPage(),
         '/admin-verify': (context) {
-          final uri = Uri.base;
-          final token = uri.queryParameters['token'];
+          // Hash routing için query parametrelerini al
+          String? token;
+          if (kIsWeb) {
+            try {
+              // Hash routing kullanıldığında, query parametreleri hash içinde olabilir
+              // window.location.hash formatı: #/admin-verify?token=xxx
+              final hash = html.window.location.hash;
+              if (hash.isNotEmpty) {
+                // Hash'ten query parametrelerini parse et
+                // Format: #/admin-verify?token=xxx
+                final hashParts = hash.split('?');
+                if (hashParts.length > 1) {
+                  final queryString = hashParts[1];
+                  final queryUri = Uri.parse('?$queryString');
+                  token = queryUri.queryParameters['token'];
+                }
+              }
+              // Eğer hash'ten bulunamazsa, Uri.base'den dene
+              if (token == null) {
+                token = Uri.base.queryParameters['token'];
+              }
+            } catch (e) {
+              print('Query parameter parse hatası: $e');
+              // Fallback: Uri.base'den dene
+              token = Uri.base.queryParameters['token'];
+            }
+          } else {
+            token = Uri.base.queryParameters['token'];
+          }
           return AdminVerifyPage(token: token);
         },
       },

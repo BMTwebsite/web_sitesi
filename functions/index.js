@@ -24,6 +24,43 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
 
   const db = admin.firestore();
   
+  // Site adını ve email adresini Firestore'dan al (spam önleme için)
+  let siteName = 'BMT Web Sitesi'; // Varsayılan değer
+  let siteEmail = null; // Site email adresi (varsa kullanılacak)
+  try {
+    const siteSettingsDoc = await db.collection('site_settings').doc('main').get();
+    if (siteSettingsDoc.exists) {
+      const siteSettings = siteSettingsDoc.data();
+      if (siteSettings) {
+        if (siteSettings.siteName) {
+          siteName = siteSettings.siteName;
+        }
+        if (siteSettings.email) {
+          siteEmail = siteSettings.email;
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Site ayarları alınamadı, varsayılan değerler kullanılıyor:', error);
+  }
+  
+  // Gönderen email adresini belirle (spam önleme için önemli)
+  // Site email varsa onu kullan, yoksa site adından email oluştur
+  let fromEmail;
+  if (siteEmail) {
+    // Site email'i varsa onu kullan
+    fromEmail = `${siteName} <${siteEmail}>`;
+  } else {
+    // Site email yoksa, site adını kullanarak email formatı oluştur
+    // Firebase domain'ini kullan (noreply yerine site adı)
+    const authDomain = functions.config().firebase?.authDomain || 'bmt-web-41790.firebaseapp.com';
+    // Site adından geçerli bir email formatı oluştur
+    const emailPrefix = siteName.toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 20) || 'website';
+    fromEmail = `${siteName} <${emailPrefix}@${authDomain}>`;
+  }
+  
   // Email içeriği
   const emailHtml = `
     <!DOCTYPE html>
@@ -70,12 +107,12 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     </head>
     <body>
       <div class="header">
-        <h1>BMT Web Sitesi</h1>
+        <h1>${siteName}</h1>
       </div>
       <div class="content">
         <h2>Admin Hesabı Onayı</h2>
         <p>Merhaba,</p>
-        <p><strong>${userEmail || 'Bir kullanıcı'}</strong> e-posta adresi ile BMT Web Sitesi için admin hesabı oluşturma talebi alınmıştır.</p>
+        <p><strong>${userEmail || 'Bir kullanıcı'}</strong> e-posta adresi ile ${siteName} için admin hesabı oluşturma talebi alınmıştır.</p>
         <p>Hesabı aktifleştirmek için aşağıdaki butona tıklayın:</p>
         <p style="text-align: center;">
           <a href="${link}" class="button">Hesabı Onayla</a>
@@ -87,18 +124,18 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
       </div>
       <div class="footer">
         <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayın.</p>
-        <p>&copy; ${new Date().getFullYear()} BMT Web Sitesi. Tüm hakları saklıdır.</p>
+        <p>&copy; ${new Date().getFullYear()} ${siteName}. Tüm hakları saklıdır.</p>
       </div>
     </body>
     </html>
   `;
 
   const emailText = `
-    BMT Web Sitesi - Admin Hesabı Onayı
+    ${siteName} - Admin Hesabı Onayı
     
     Merhaba,
     
-    ${userEmail || 'Bir kullanıcı'} e-posta adresi ile BMT Web Sitesi için admin hesabı oluşturma talebi alınmıştır.
+    ${userEmail || 'Bir kullanıcı'} e-posta adresi ile ${siteName} için admin hesabı oluşturma talebi alınmıştır.
     Hesabı aktifleştirmek için aşağıdaki linke tıklayın:
     
     ${link}
@@ -117,9 +154,13 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     await db.collection('mail').add({
       to: to,
       message: {
-        subject: subject || 'BMT Web Sitesi Onay Maili',
+        subject: subject || `${siteName} Onay Maili`,
         html: emailHtml,
         text: emailText,
+        // Spam önleme için: Site adını gönderen olarak kullan (noreply yerine)
+        from: fromEmail,
+        // Yanıt adresi ekle (spam önleme için önemli)
+        replyTo: siteEmail || to, // Site email varsa onu kullan, yoksa alıcıya yanıt verilebilmesi için
       },
     });
 
