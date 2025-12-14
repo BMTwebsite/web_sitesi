@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'secrets.dart';
 import 'dart:html' as html show window;
 import 'pages/home_page.dart';
@@ -12,6 +13,8 @@ import 'pages/admin_login_page.dart';
 import 'pages/admin_register_page.dart';
 import 'pages/admin_verify_page.dart';
 import 'pages/admin_panel_page.dart';
+import 'providers/auth_provider.dart';
+import 'providers/firestore_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -139,20 +142,25 @@ class BMTApp extends StatelessWidget {
       );
     }
     
-    return MaterialApp(
-      title: 'BMT Web Sitesi',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF2196F3),
-          secondary: const Color(0xFFF44336),
-          surface: const Color(0xFF0A1929),
-          background: const Color(0xFF0A1929),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => FirestoreProvider()),
+      ],
+      child: MaterialApp(
+        title: 'BMT Web Sitesi',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.dark(
+            primary: const Color(0xFF2196F3),
+            secondary: const Color(0xFFF44336),
+            surface: const Color(0xFF0A1929),
+            background: const Color(0xFF0A1929),
+          ),
+          scaffoldBackgroundColor: const Color(0xFF0A1929),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0A1929),
-      ),
-      initialRoute: '/',
+        initialRoute: '/',
       routes: {
         '/': (context) => const HomePage(),
         '/home': (context) => const HomePage(),
@@ -167,59 +175,104 @@ class BMTApp extends StatelessWidget {
           String? token;
           if (kIsWeb) {
             try {
-              // Hash routing kullanıldığında, query parametreleri hash içinde olabilir
-              // window.location.hash formatı: #/admin-verify?token=xxx
+              // ignore: avoid_web_libraries_in_flutter
+              final fullUrl = html.window.location.href;
               final hash = html.window.location.hash;
-              print('🔍 Hash routing - Hash: $hash');
+              final search = html.window.location.search ?? '';
               
+              print('🔍 Full URL: $fullUrl');
+              print('🔍 Hash: $hash');
+              print('🔍 Search: $search');
+              
+              // Yöntem 1: Hash'ten parse et (#/admin-verify?token=xxx)
               if (hash.isNotEmpty) {
-                // Hash'ten query parametrelerini parse et
-                // Format: #/admin-verify?token=xxx
-                final hashParts = hash.split('?');
-                print('🔍 Hash parts: $hashParts');
+                // Hash formatı: #/admin-verify?token=xxx
+                if (hash.contains('?')) {
+                  final hashParts = hash.split('?');
+                  if (hashParts.length > 1) {
+                    final queryString = hashParts[1];
+                    print('🔍 Query string from hash: $queryString');
+                    try {
+                      final queryUri = Uri.parse('?$queryString');
+                      token = queryUri.queryParameters['token'];
+                      print('🔍 Token from hash query: $token');
+                    } catch (e) {
+                      print('⚠️ Hash query parse hatası: $e');
+                    }
+                  }
+                }
                 
-                if (hashParts.length > 1) {
-                  final queryString = hashParts[1];
-                  print('🔍 Query string: $queryString');
-                  final queryUri = Uri.parse('?$queryString');
-                  token = queryUri.queryParameters['token'];
-                  print('🔍 Token from hash: $token');
+                // Alternatif: Hash içinde direkt token ara
+                if (token == null || token.isEmpty) {
+                  final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+                  if (tokenMatch != null) {
+                    token = Uri.decodeComponent(tokenMatch.group(1)!);
+                    print('🔍 Token from hash regex: $token');
+                  }
                 }
               }
               
-              // Eğer hash'ten bulunamazsa, Uri.base'den dene
-              if (token == null || token.isEmpty) {
-                final baseUri = Uri.base;
-                print('🔍 Uri.base: $baseUri');
-                token = baseUri.queryParameters['token'];
-                print('🔍 Token from Uri.base: $token');
-              }
-              
-              // Son çare: window.location.search'ten dene
-              if (token == null || token.isEmpty) {
+              // Yöntem 2: Search'ten parse et (?token=xxx)
+              if ((token == null || token.isEmpty) && search.isNotEmpty) {
                 try {
-                  // ignore: avoid_web_libraries_in_flutter
-                  final search = html.window.location.search;
-                  print('🔍 Location search: $search');
-                  if (search != null && search.isNotEmpty) {
-                    final searchUri = Uri.parse(search);
-                    token = searchUri.queryParameters['token'];
-                    print('🔍 Token from search: $token');
-                  }
+                  final searchUri = Uri.parse(search);
+                  token = searchUri.queryParameters['token'];
+                  print('🔍 Token from search: $token');
                 } catch (e) {
                   print('⚠️ Search parse hatası: $e');
                 }
               }
-            } catch (e) {
+              
+              // Yöntem 3: Full URL'den parse et
+              if (token == null || token.isEmpty) {
+                try {
+                  final fullUri = Uri.parse(fullUrl);
+                  token = fullUri.queryParameters['token'];
+                  print('🔍 Token from full URL: $token');
+                  
+                  // Hash fragment'ten de dene
+                  if ((token == null || token.isEmpty) && fullUri.hasFragment) {
+                    final fragment = fullUri.fragment;
+                    if (fragment.isNotEmpty && fragment.contains('token=')) {
+                      final fragmentParts = fragment.split('token=');
+                      if (fragmentParts.length > 1) {
+                        final tokenPart = fragmentParts[1].split('&')[0].split('#')[0];
+                        if (tokenPart.isNotEmpty) {
+                          token = Uri.decodeComponent(tokenPart);
+                          print('🔍 Token from fragment: $token');
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {
+                  print('⚠️ Full URL parse hatası: $e');
+                }
+              }
+              
+              // Yöntem 4: Uri.base'den dene (fallback)
+              if (token == null || token.isEmpty) {
+                final baseUri = Uri.base;
+                token = baseUri.queryParameters['token'];
+                print('🔍 Token from Uri.base: $token');
+              }
+            } catch (e, stackTrace) {
               print('❌ Query parameter parse hatası: $e');
-              // Fallback: Uri.base'den dene
-              token = Uri.base.queryParameters['token'];
+              print('📚 Stack trace: $stackTrace');
+              // Son çare: Uri.base'den dene
+              try {
+                token = Uri.base.queryParameters['token'];
+              } catch (e2) {
+                print('❌ Uri.base parse hatası: $e2');
+              }
             }
           } else {
             token = Uri.base.queryParameters['token'];
           }
           
           print('✅ Final token: $token');
+          if (token == null || token.isEmpty) {
+            print('⚠️ Token bulunamadı! URL formatını kontrol edin.');
+          }
           return AdminVerifyPage(token: token);
         },
       },
@@ -236,6 +289,7 @@ class BMTApp extends StatelessWidget {
         }
         return null;
       },
+      ),
     );
   }
 }

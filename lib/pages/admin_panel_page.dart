@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/firestore_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/firestore_provider.dart';
 
 class AdminPanelPage extends StatefulWidget {
   const AdminPanelPage({super.key});
@@ -10,8 +11,6 @@ class AdminPanelPage extends StatefulWidget {
 }
 
 class _AdminPanelPageState extends State<AdminPanelPage> {
-  final _authService = AuthService();
-  final _firestoreService = FirestoreService();
   int _selectedTab = 0;
 
   @override
@@ -56,7 +55,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                           const SizedBox(width: 12),
                           OutlinedButton.icon(
                             onPressed: () async {
-                              await _authService.signOut();
+                              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                              await authProvider.signOut();
                               if (mounted) {
                                 Navigator.pushReplacementNamed(context, '/');
                               }
@@ -131,9 +131,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
           ),
         ),
         const SizedBox(height: 20),
-        StreamBuilder<List<EventData>>(
-          stream: _firestoreService.getEvents(),
-          builder: (context, snapshot) {
+        Consumer<FirestoreProvider>(
+          builder: (context, firestoreProvider, _) => StreamBuilder<List<EventData>>(
+            stream: firestoreProvider.getEvents(),
+            builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
                 child: CircularProgressIndicator(),
@@ -179,39 +180,43 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
               },
             );
           },
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSiteSettingsTab() {
-    return StreamBuilder<Map<String, dynamic>>(
-      stream: _firestoreService.getSiteSettingsStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
+    return Consumer<FirestoreProvider>(
+      builder: (context, firestoreProvider, _) => StreamBuilder<Map<String, dynamic>>(
+        stream: firestoreProvider.getSiteSettingsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Hata: ${snapshot.error}',
-              style: const TextStyle(color: Colors.red),
-            ),
-          );
-        }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Hata: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          }
 
-        final settings = snapshot.data ?? {};
-        return _SiteSettingsEditor(settings: settings);
-      },
+          final settings = snapshot.data ?? {};
+          return _SiteSettingsEditor(settings: settings);
+        },
+      ),
     );
   }
 
   Widget _buildContactSettingsTab() {
-    return StreamBuilder<Map<String, dynamic>>(
-      stream: _firestoreService.getContactSettingsStream(),
+    return Consumer<FirestoreProvider>(
+      builder: (context, firestoreProvider, _) => StreamBuilder<Map<String, dynamic>>(
+        stream: firestoreProvider.getContactSettingsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -231,6 +236,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
         final settings = snapshot.data ?? {};
         return _ContactSettingsEditor(settings: settings);
       },
+      ),
     );
   }
 
@@ -410,10 +416,11 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   );
 
                   try {
+                    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
                     if (isEditing && event.id != null) {
-                      await _firestoreService.updateEvent(event.id!, eventData);
+                      await firestoreProvider.updateEvent(event.id!, eventData);
                     } else {
-                      await _firestoreService.addEvent(eventData);
+                      await firestoreProvider.addEvent(eventData);
                     }
                     if (mounted) {
                       Navigator.pop(context);
@@ -464,7 +471,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
 
     try {
-      final deletedCount = await _firestoreService.deleteAllPendingAdmins();
+      final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+      final deletedCount = await firestoreProvider.deleteAllPendingAdmins();
       
       if (!context.mounted) return;
       Navigator.pop(context); // Loading dialogunu kapat
@@ -556,7 +564,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
     if (confirmed == true) {
       try {
-        await _firestoreService.deleteEvent(eventId);
+        final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+        await firestoreProvider.deleteEvent(eventId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -839,7 +848,6 @@ class _ContactSettingsEditor extends StatefulWidget {
 class _ContactSettingsEditorState extends State<_ContactSettingsEditor> {
   late TextEditingController _emailController;
   late List<Map<String, dynamic>> _socialMediaList;
-  final _firestoreService = FirestoreService();
   bool _isSaving = false;
 
   @override
@@ -980,7 +988,8 @@ class _ContactSettingsEditorState extends State<_ContactSettingsEditor> {
     setState(() => _isSaving = true);
 
     try {
-      await _firestoreService.updateContactSettings({
+      final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+      await firestoreProvider.updateContactSettings({
         'email': _emailController.text.trim(),
         'socialMedia': _socialMediaList,
       });
@@ -1251,7 +1260,6 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
   late TextEditingController _copyrightController;
-  final _firestoreService = FirestoreService();
   bool _isSaving = false;
 
   @override
@@ -1502,7 +1510,8 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
     setState(() => _isSaving = true);
 
     try {
-      await _firestoreService.updateSiteSettings({
+      final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+      await firestoreProvider.updateSiteSettings({
         'siteName': _siteNameController.text.trim(),
         'siteDescription': _siteDescriptionController.text.trim(),
         'email': _emailController.text.trim(),

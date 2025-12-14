@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/firestore_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/firestore_provider.dart';
 import '../services/email_service.dart';
 
 class AdminRegisterPage extends StatefulWidget {
@@ -16,8 +17,6 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _firestoreService = FirestoreService();
-  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -44,14 +43,12 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
     print('👤 Soyad: ${_lastNameController.text.trim()}');
     print('📧 Email: ${_emailController.text.trim()}');
 
-    setState(() {
-      _isLoading = true;
-    });
+    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
 
     try {
       print('📝 Firestore\'a kayıt yapılıyor...');
       // Register pending admin
-      final token = await _firestoreService.registerPendingAdmin(
+      final token = await firestoreProvider.registerPendingAdmin(
         _firstNameController.text.trim(),
         _lastNameController.text.trim(),
         _emailController.text.trim(),
@@ -124,13 +121,9 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
           duration: const Duration(seconds: 5),
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        print('🔄 Loading durumu false olarak ayarlandı');
-      }
+    } catch (e) {
+      // Error already handled above
+      rethrow;
     }
   }
 
@@ -397,13 +390,14 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                   ),
                   const SizedBox(height: 32),
                   // Register Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : () {
-                        print('🔘 Kayıt Ol butonuna tıklandı');
-                        _register();
-                      },
+                  Consumer<FirestoreProvider>(
+                    builder: (context, firestoreProvider, _) => SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: firestoreProvider.isLoading ? null : () {
+                          print('🔘 Kayıt Ol butonuna tıklandı');
+                          _register();
+                        },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2196F3),
                         foregroundColor: Colors.white,
@@ -413,23 +407,24 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                         ),
                         elevation: 2,
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        child: firestoreProvider.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'Kayıt Ol',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            )
-                          : const Text(
-                              'Kayıt Ol',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),

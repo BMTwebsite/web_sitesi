@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/firestore_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/firestore_provider.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -13,9 +14,6 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
-  final _firestoreService = FirestoreService();
-  bool _isLoading = false;
   bool _obscurePassword = true;
 
   @override
@@ -30,13 +28,12 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
 
     try {
       // Check if admin is verified
-      final isVerified = await _firestoreService.isAdminVerified(
+      final isVerified = await firestoreProvider.isAdminVerified(
         _emailController.text.trim(),
       );
 
@@ -53,7 +50,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       }
 
       // Sign in
-      await _authService.signInWithEmailAndPassword(
+      await authProvider.signIn(
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -61,11 +58,11 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       if (!mounted) return;
 
       // Check if user is admin
-      final isAdmin = await _authService.isAdmin();
+      final isAdmin = await authProvider.checkAdminStatus();
       if (isAdmin) {
-        Navigator.pushReplacementNamed(context, '/admin');
+        Navigator.pushReplacementNamed(context, '/admin-panel');
       } else {
-        await _authService.signOut();
+        await authProvider.signOut();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -76,20 +73,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -238,32 +228,34 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                   ),
                   const SizedBox(height: 32),
                   // Login Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _signIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, _) => ElevatedButton(
+                      onPressed: authProvider.isLoading ? null : _signIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2196F3),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      child: authProvider.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Giriş Yap',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Giriş Yap',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                   ),
                   const SizedBox(height: 20),
                   // Register Link

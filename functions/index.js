@@ -12,8 +12,13 @@
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const sgMail = require('@sendgrid/mail');
 
 admin.initializeApp();
+
+// SendGrid API key'i Firebase Functions config'den al
+// Kurulum: firebase functions:config:set sendgrid.key="YOUR_API_KEY"
+sgMail.setApiKey(functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY || '');
 
 // Email gönderme fonksiyonu - Firebase Extensions (Trigger Email) kullanarak
 // Bu fonksiyon Firestore'a mail koleksiyonuna doküman ekler
@@ -148,30 +153,119 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
   `;
 
   try {
-    // Firestore'a mail koleksiyonuna doküman ekle
-    // Firebase Extensions - Trigger Email extension'ı bu dokümanı görünce otomatik e-posta gönderir
-    // Extension kurulumu: Firebase Console > Extensions > Trigger Email
-    await db.collection('mail').add({
+    console.log('📧 Email gönderme işlemi başlatılıyor...');
+    console.log('📬 Alıcı:', to);
+    console.log('👤 Kullanıcı email:', userEmail);
+    console.log('📝 Konu:', subject || `${siteName} Onay Maili`);
+    console.log('🔗 Link:', link);
+    console.log('📧 Gönderen:', fromEmail);
+    
+    // SendGrid API key kontrolü
+    const sendGridApiKey = functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY;
+    if (!sendGridApiKey) {
+      console.warn('⚠️ SendGrid API key bulunamadı, Firestore\'a yazılıyor (Extension kullanılacak)');
+      
+      // SendGrid yoksa eski yöntemle Firestore'a yaz (Extension için)
+      const mailData = {
+        to: to,
+        message: {
+          subject: subject || `${siteName} Onay Maili`,
+          html: emailHtml,
+          text: emailText,
+        },
+      };
+      
+      const docRef = await db.collection('mail').add(mailData);
+      console.log('✅ Email Firestore\'a eklendi (Extension gönderecek):', docRef.id);
+      
+      return { 
+        success: true,
+        messageId: docRef.id,
+        message: 'Email Firestore\'a eklendi, Extension gönderecek'
+      };
+    }
+    
+    // SendGrid ile direkt email gönder
+    console.log('📤 SendGrid ile direkt email gönderiliyor...');
+    
+    // From email'i düzelt (SendGrid formatı)
+    let sendFromEmail = siteEmail || 'noreply@bmt-web-41790.firebaseapp.com';
+    if (fromEmail.includes('<')) {
+      // "Site Name <email@domain.com>" formatından email'i çıkar
+      const match = fromEmail.match(/<([^>]+)>/);
+      if (match) {
+        sendFromEmail = match[1];
+      }
+    }
+    
+    const msg = {
       to: to,
-      message: {
-        subject: subject || `${siteName} Onay Maili`,
-        html: emailHtml,
-        text: emailText,
-        // Spam önleme için: Site adını gönderen olarak kullan (noreply yerine)
-        from: fromEmail,
-        // Yanıt adresi ekle (spam önleme için önemli)
-        replyTo: siteEmail || to, // Site email varsa onu kullan, yoksa alıcıya yanıt verilebilmesi için
+      from: {
+        email: sendFromEmail,
+        name: siteName
       },
+      subject: subject || `${siteName} Onay Maili`,
+      html: emailHtml,
+      text: emailText,
+      ...(siteEmail && { replyTo: siteEmail }),
+    };
+    
+    console.log('📧 SendGrid mesajı hazırlandı:', {
+      to: msg.to,
+      from: msg.from,
+      subject: msg.subject
     });
-
-    console.log('Email kuyruğa eklendi:', to);
-    return { success: true };
+    
+    await sgMail.send(msg);
+    
+    console.log('✅ Email SendGrid ile başarıyla gönderildi!');
+    console.log('📬 Alıcı:', to);
+    
+    // Firestore'a da kaydet (log için)
+    try {
+      await db.collection('mail').add({
+        to: to,
+        message: {
+          subject: subject || `${siteName} Onay Maili`,
+          html: emailHtml,
+          text: emailText,
+        },
+        sentVia: 'sendgrid',
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (firestoreError) {
+      console.warn('⚠️ Firestore\'a kayıt yapılamadı (önemli değil):', firestoreError);
+    }
+    
+    return { 
+      success: true,
+      message: 'Email başarıyla gönderildi',
+      sentVia: 'sendgrid'
+    };
   } catch (error) {
-    console.error('Email kuyruğa ekleme hatası:', error);
+    console.error('❌ Email kuyruğa ekleme hatası:', error);
+    console.error('📚 Error details:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // Daha detaylı hata mesajı
+    let errorMessage = 'Email kuyruğa eklenemedi';
+    if (error.code === 'permission-denied') {
+      errorMessage = 'Firestore yazma izni yok. Firestore Security Rules\'ı kontrol edin.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     throw new functions.https.HttpsError(
       'internal',
-      'Email kuyruğa eklenemedi',
-      error.message
+      errorMessage,
+      {
+        code: error.code,
+        message: error.message,
+        originalError: error.toString()
+      }
     );
   }
 });

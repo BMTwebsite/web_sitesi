@@ -12,6 +12,20 @@ service cloud.firestore {
     match /admins/{document=**} {
       allow read, write: if true;
     }
+    // Mail koleksiyonu - Trigger Email extension için gerekli
+    match /mail/{document=**} {
+      allow read, write: if true;
+    }
+    // Site settings
+    match /site_settings/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    // Contact settings
+    match /contact_settings/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }
 

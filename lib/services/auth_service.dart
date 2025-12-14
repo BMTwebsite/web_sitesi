@@ -29,6 +29,24 @@ class AuthService {
     }
   }
 
+  // Create user with email and password
+  Future<UserCredential> createUserWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw 'Bir hata oluştu: $e';
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     await _auth.signOut();

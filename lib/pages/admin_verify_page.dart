@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/firestore_service.dart';
-import '../services/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import '../providers/firestore_provider.dart';
+import '../providers/auth_provider.dart';
+import 'dart:html' as html show window;
 
 class AdminVerifyPage extends StatefulWidget {
   final String? token;
@@ -13,8 +15,6 @@ class AdminVerifyPage extends StatefulWidget {
 }
 
 class _AdminVerifyPageState extends State<AdminVerifyPage> {
-  final _firestoreService = FirestoreService();
-  final _authService = AuthService();
   bool _isLoading = true;
   String? _message;
   bool _isSuccess = false;
@@ -24,24 +24,58 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
     super.initState();
     // Token'ı kontrol et ve debug log ekle
     print('🔍 AdminVerifyPage initState - Token: ${widget.token}');
-    if (widget.token != null && widget.token!.isNotEmpty) {
+    
+    // Web'de token yoksa, sayfa yüklendikten sonra tekrar kontrol et
+    if (kIsWeb && (widget.token == null || widget.token!.isEmpty)) {
+      // Biraz bekle ve tekrar kontrol et (hash routing için)
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          // ignore: avoid_web_libraries_in_flutter
+          final hash = html.window.location.hash;
+          print('🔍 Delayed check - Hash: $hash');
+          
+          if (hash.isNotEmpty && hash.contains('token=')) {
+            // Token'ı hash'ten parse et
+            final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+            if (tokenMatch != null) {
+              final token = Uri.decodeComponent(tokenMatch.group(1)!);
+              print('✅ Token bulundu (delayed): $token');
+              _verifyToken(token);
+              return;
+            }
+          }
+          
+          // Hala token yoksa hata göster
+          setState(() {
+            _isLoading = false;
+            _message = 'Geçersiz onay linki. Token bulunamadı.\n\n'
+                'Lütfen email\'deki linki tekrar kontrol edin veya linki tarayıcıya kopyalayıp yapıştırın.';
+            _isSuccess = false;
+          });
+        }
+      });
+    } else if (widget.token != null && widget.token!.isNotEmpty) {
       _verifyToken(widget.token!);
     } else {
       print('❌ Token bulunamadı veya boş');
       setState(() {
         _isLoading = false;
-        _message = 'Geçersiz onay linki. Token bulunamadı.';
+        _message = 'Geçersiz onay linki. Token bulunamadı.\n\n'
+            'Lütfen email\'deki linki tekrar kontrol edin.';
         _isSuccess = false;
       });
     }
   }
 
   Future<void> _verifyToken(String token) async {
+    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
     try {
       print('🔍 Token doğrulanıyor: $token');
       
       // Verify admin
-      final adminData = await _firestoreService.verifyAdmin(token);
+      final adminData = await firestoreProvider.verifyAdmin(token);
       final email = adminData['email']!;
       final password = adminData['password']!;
       
@@ -51,7 +85,7 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
       try {
         // Önce giriş yapmayı dene
         print('🔐 Giriş yapılıyor...');
-        await _authService.signInWithEmailAndPassword(email, password);
+        await authProvider.signIn(email, password);
         print('✅ Giriş başarılı');
       } catch (e) {
         print('⚠️ Giriş hatası: $e');
@@ -59,18 +93,12 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
         if (e.toString().contains('user-not-found') || 
             e.toString().contains('Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı')) {
           print('👤 Kullanıcı oluşturuluyor...');
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
+          await authProvider.createUserWithEmailAndPassword(email, password);
           print('✅ Kullanıcı oluşturuldu');
         } else {
           // Diğer hatalar için tekrar dene
           print('🔄 Tekrar giriş deneniyor...');
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
+          await authProvider.signIn(email, password);
           print('✅ Giriş başarılı (ikinci deneme)');
         }
       }
@@ -81,19 +109,7 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
       setState(() {
         _isLoading = false;
         _isSuccess = true;
-        _message = 'Onay Verildi!\n\nHesabınız başarıyla onaylandı ve giriş yaptınız.';
-      });
-
-      // Admin paneline yönlendir (3 saniye sonra)
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          print('🔄 Admin paneline yönlendiriliyor...');
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            '/admin-panel',
-            (route) => false, // Tüm önceki route'ları temizle
-          );
-        }
+        _message = 'Hesabınız başarıyla onaylandı!';
       });
     } catch (e, stackTrace) {
       print('❌ Onay hatası: $e');
@@ -139,7 +155,7 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
                 ),
               const SizedBox(height: 24),
               Text(
-                _isSuccess ? 'Onay Verildi!' : 'Onay Hatası',
+                _isSuccess ? 'Hesap Onaylandı' : 'Onay Hatası',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 32,
@@ -170,25 +186,6 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
                     ),
                   ),
                   child: const Text('Giriş Sayfasına Dön'),
-                ),
-              if (!_isLoading && _isSuccess)
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/admin-panel',
-                      (route) => false,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                  ),
-                  child: const Text('Admin Paneline Git'),
                 ),
             ],
           ),
