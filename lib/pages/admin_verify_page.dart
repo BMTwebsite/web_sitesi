@@ -22,12 +22,15 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.token != null) {
+    // Token'ı kontrol et ve debug log ekle
+    print('🔍 AdminVerifyPage initState - Token: ${widget.token}');
+    if (widget.token != null && widget.token!.isNotEmpty) {
       _verifyToken(widget.token!);
     } else {
+      print('❌ Token bulunamadı veya boş');
       setState(() {
         _isLoading = false;
-        _message = 'Geçersiz onay linki.';
+        _message = 'Geçersiz onay linki. Token bulunamadı.';
         _isSuccess = false;
       });
     }
@@ -35,46 +38,80 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
 
   Future<void> _verifyToken(String token) async {
     try {
+      print('🔍 Token doğrulanıyor: $token');
+      
       // Verify admin
       final adminData = await _firestoreService.verifyAdmin(token);
       final email = adminData['email']!;
       final password = adminData['password']!;
+      
+      print('✅ Admin doğrulandı: $email');
 
-      // Create Firebase Auth user
+      // Firebase Auth kullanıcısını oluştur veya giriş yap
       try {
+        // Önce giriş yapmayı dene
+        print('🔐 Giriş yapılıyor...');
         await _authService.signInWithEmailAndPassword(email, password);
+        print('✅ Giriş başarılı');
       } catch (e) {
-        // If user doesn't exist, create it
-        if (e.toString().contains('user-not-found')) {
+        print('⚠️ Giriş hatası: $e');
+        // Eğer kullanıcı yoksa, oluştur
+        if (e.toString().contains('user-not-found') || 
+            e.toString().contains('Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı')) {
+          print('👤 Kullanıcı oluşturuluyor...');
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
             email: email,
             password: password,
           );
+          print('✅ Kullanıcı oluşturuldu');
         } else {
-          rethrow;
+          // Diğer hatalar için tekrar dene
+          print('🔄 Tekrar giriş deneniyor...');
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+          print('✅ Giriş başarılı (ikinci deneme)');
         }
       }
 
       if (!mounted) return;
 
+      print('✅ Onay işlemi tamamlandı');
       setState(() {
         _isLoading = false;
         _isSuccess = true;
-        _message = 'Hesabınız başarıyla onaylandı! Giriş yapabilirsiniz.';
+        _message = 'Onay Verildi!\n\nHesabınız başarıyla onaylandı ve giriş yaptınız.';
       });
 
-      // Navigate to login after 2 seconds
-      Future.delayed(const Duration(seconds: 2), () {
+      // Admin paneline yönlendir (3 saniye sonra)
+      Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/admin-login');
+          print('🔄 Admin paneline yönlendiriliyor...');
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/admin-panel',
+            (route) => false, // Tüm önceki route'ları temizle
+          );
         }
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Onay hatası: $e');
+      print('📚 Stack trace: $stackTrace');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _isSuccess = false;
-        _message = e.toString();
+        // Daha anlaşılır hata mesajı
+        String errorMessage = 'Onay işlemi başarısız oldu.';
+        if (e.toString().contains('Geçersiz') || e.toString().contains('geçersiz')) {
+          errorMessage = 'Geçersiz veya kullanılmış onay linki.';
+        } else if (e.toString().contains('timeout') || e.toString().contains('zaman aşımı')) {
+          errorMessage = 'Bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.';
+        } else {
+          errorMessage = 'Hata: ${e.toString()}';
+        }
+        _message = errorMessage;
       });
     }
   }
@@ -102,7 +139,7 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
                 ),
               const SizedBox(height: 24),
               Text(
-                _isSuccess ? 'Onay Başarılı!' : 'Onay Hatası',
+                _isSuccess ? 'Onay Verildi!' : 'Onay Hatası',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 32,
@@ -133,6 +170,25 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
                     ),
                   ),
                   child: const Text('Giriş Sayfasına Dön'),
+                ),
+              if (!_isLoading && _isSuccess)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/admin-panel',
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                  ),
+                  child: const Text('Admin Paneline Git'),
                 ),
             ],
           ),

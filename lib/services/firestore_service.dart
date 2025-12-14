@@ -57,7 +57,7 @@ class FirestoreService {
 
 
   // Register pending admin
-  Future<String> registerPendingAdmin(String email, String password) async {
+  Future<String> registerPendingAdmin(String firstName, String lastName, String email, String password) async {
     try {
       print('🔍 Mevcut admin kontrolü yapılıyor...');
       // Check if admin already exists with timeout
@@ -108,7 +108,7 @@ class FirestoreService {
           email.hashCode.toString();
 
       print('💾 Firestore\'a kayıt yapılıyor...');
-      print('📋 Kayıt verisi: email=$email, token=$token');
+      print('📋 Kayıt verisi: firstName=$firstName, lastName=$lastName, email=$email, token=$token');
       print('🔧 Firestore instance: ${_firestore.app.name}');
       print('🔧 Collection path: $_pendingAdminsCollection');
       
@@ -127,6 +127,8 @@ class FirestoreService {
       // Add to pending admins with timeout
       print('📝 Doküman ekleniyor...');
       final docRef = await _firestore.collection(_pendingAdminsCollection).add({
+        'firstName': firstName,
+        'lastName': lastName,
         'email': email,
         'password': password, // Note: In production, hash this password
         'token': token,
@@ -192,6 +194,8 @@ class FirestoreService {
       final data = doc.data();
       final email = data['email'] as String;
       final password = data['password'] as String;
+      final firstName = data['firstName'] as String? ?? '';
+      final lastName = data['lastName'] as String? ?? '';
 
       // Check if admin already exists in admins collection
       final existingAdminQuery = await _firestore
@@ -211,6 +215,8 @@ class FirestoreService {
         // Add to admins collection
         final adminRef = _firestore.collection(_adminsCollection).doc();
         batch.set(adminRef, {
+          'firstName': firstName,
+          'lastName': lastName,
           'email': email,
           'createdAt': FieldValue.serverTimestamp(),
         });
@@ -218,11 +224,21 @@ class FirestoreService {
         // Commit batch transaction
         await batch.commit();
         
-        print('✅ Admin başarıyla onaylandı ve admins koleksiyonuna eklendi: $email');
+        print('✅ Admin başarıyla onaylandı ve admins koleksiyonuna eklendi: $firstName $lastName ($email)');
       } else {
-        // Admin already exists, just mark as verified
+        // Admin already exists, update firstName and lastName if they exist
+        final existingDoc = existingAdminQuery.docs.first;
+        final updateData = <String, dynamic>{};
+        if (firstName.isNotEmpty) updateData['firstName'] = firstName;
+        if (lastName.isNotEmpty) updateData['lastName'] = lastName;
+        
+        if (updateData.isNotEmpty) {
+          await existingDoc.reference.update(updateData);
+        }
+        
+        // Mark as verified in pending_admins
         await doc.reference.update({'verified': true});
-        print('✅ Admin zaten admins koleksiyonunda, sadece verified işaretlendi: $email');
+        print('✅ Admin zaten admins koleksiyonunda, bilgiler güncellendi: $email');
       }
 
       return {'email': email, 'password': password};

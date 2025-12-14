@@ -11,6 +11,8 @@ class AdminRegisterPage extends StatefulWidget {
 
 class _AdminRegisterPageState extends State<AdminRegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -21,6 +23,8 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -36,6 +40,8 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
     }
 
     print('✅ Form validasyonu başarılı');
+    print('👤 Ad: ${_firstNameController.text.trim()}');
+    print('👤 Soyad: ${_lastNameController.text.trim()}');
     print('📧 Email: ${_emailController.text.trim()}');
 
     setState(() {
@@ -46,6 +52,8 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
       print('📝 Firestore\'a kayıt yapılıyor...');
       // Register pending admin
       final token = await _firestoreService.registerPendingAdmin(
+        _firstNameController.text.trim(),
+        _lastNameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -189,6 +197,78 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 40),
+                  // First Name Field
+                  TextFormField(
+                    controller: _firstNameController,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Ad',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      prefixIcon: const Icon(Icons.person, color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0xFF0A1929),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Ad gerekli';
+                      }
+                      if (value.trim().length < 2) {
+                        return 'Ad en az 2 karakter olmalı';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  // Last Name Field
+                  TextFormField(
+                    controller: _lastNameController,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Soyad',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
+                      filled: true,
+                      fillColor: const Color(0xFF0A1929),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Soyad gerekli';
+                      }
+                      if (value.trim().length < 2) {
+                        return 'Soyad en az 2 karakter olmalı';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
                   // Email Field
                   TextFormField(
                     controller: _emailController,

@@ -170,28 +170,56 @@ class BMTApp extends StatelessWidget {
               // Hash routing kullanıldığında, query parametreleri hash içinde olabilir
               // window.location.hash formatı: #/admin-verify?token=xxx
               final hash = html.window.location.hash;
+              print('🔍 Hash routing - Hash: $hash');
+              
               if (hash.isNotEmpty) {
                 // Hash'ten query parametrelerini parse et
                 // Format: #/admin-verify?token=xxx
                 final hashParts = hash.split('?');
+                print('🔍 Hash parts: $hashParts');
+                
                 if (hashParts.length > 1) {
                   final queryString = hashParts[1];
+                  print('🔍 Query string: $queryString');
                   final queryUri = Uri.parse('?$queryString');
                   token = queryUri.queryParameters['token'];
+                  print('🔍 Token from hash: $token');
                 }
               }
+              
               // Eğer hash'ten bulunamazsa, Uri.base'den dene
-              if (token == null) {
-                token = Uri.base.queryParameters['token'];
+              if (token == null || token.isEmpty) {
+                final baseUri = Uri.base;
+                print('🔍 Uri.base: $baseUri');
+                token = baseUri.queryParameters['token'];
+                print('🔍 Token from Uri.base: $token');
+              }
+              
+              // Son çare: window.location.search'ten dene
+              if (token == null || token.isEmpty) {
+                try {
+                  // ignore: avoid_web_libraries_in_flutter
+                  final search = html.window.location.search;
+                  print('🔍 Location search: $search');
+                  if (search != null && search.isNotEmpty) {
+                    final searchUri = Uri.parse(search);
+                    token = searchUri.queryParameters['token'];
+                    print('🔍 Token from search: $token');
+                  }
+                } catch (e) {
+                  print('⚠️ Search parse hatası: $e');
+                }
               }
             } catch (e) {
-              print('Query parameter parse hatası: $e');
+              print('❌ Query parameter parse hatası: $e');
               // Fallback: Uri.base'den dene
               token = Uri.base.queryParameters['token'];
             }
           } else {
             token = Uri.base.queryParameters['token'];
           }
+          
+          print('✅ Final token: $token');
           return AdminVerifyPage(token: token);
         },
       },
