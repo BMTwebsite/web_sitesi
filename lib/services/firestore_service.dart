@@ -20,6 +20,8 @@ class FirestoreService {
   final String _adminsCollection = 'admins';
   final String _contactSettingsCollection = 'contact_settings';
   final String _contactSettingsDocId = 'main';
+  final String _siteSettingsCollection = 'site_settings';
+  final String _siteSettingsDocId = 'main';
 
 
   // Get all events
@@ -275,35 +277,10 @@ class FirestoreService {
         .get();
     
     if (!doc.exists) {
-      // Return default values if document doesn't exist
+      // Return empty values - admin will fill these in
       return {
-        'email': 'info@bmt.edu.tr',
-        'socialMedia': [
-          {
-            'name': 'Instagram',
-            'icon': 'camera_alt',
-            'url': 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
-            'color': '#E4405F',
-          },
-          {
-            'name': 'LinkedIn',
-            'icon': 'business',
-            'url': 'https://www.linkedin.com/company/banubmt/',
-            'color': '#0077B5',
-          },
-          {
-            'name': 'YouTube',
-            'icon': 'play_circle_filled',
-            'url': 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
-            'color': '#FF0000',
-          },
-          {
-            'name': 'TikTok',
-            'icon': 'music_note',
-            'url': 'https://www.tiktok.com/@banubmt',
-            'color': '#000000',
-          },
-        ],
+        'email': '',
+        'socialMedia': [],
       };
     }
     
@@ -318,34 +295,10 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) {
       if (!snapshot.exists) {
+        // Return empty values - admin will fill these in
         return {
-          'email': 'info@bmt.edu.tr',
-          'socialMedia': [
-            {
-              'name': 'Instagram',
-              'icon': 'camera_alt',
-              'url': 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
-              'color': '#E4405F',
-            },
-            {
-              'name': 'LinkedIn',
-              'icon': 'business',
-              'url': 'https://www.linkedin.com/company/banubmt/',
-              'color': '#0077B5',
-            },
-            {
-              'name': 'YouTube',
-              'icon': 'play_circle_filled',
-              'url': 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
-              'color': '#FF0000',
-            },
-            {
-              'name': 'TikTok',
-              'icon': 'music_note',
-              'url': 'https://www.tiktok.com/@banubmt',
-              'color': '#000000',
-            },
-          ],
+          'email': '',
+          'socialMedia': [],
         };
       }
       return snapshot.data()!;
@@ -357,6 +310,57 @@ class FirestoreService {
     await _firestore
         .collection(_contactSettingsCollection)
         .doc(_contactSettingsDocId)
+        .set(settings, SetOptions(merge: true));
+  }
+
+  // Get site settings (site name, description, contact info, address, phone)
+  Future<Map<String, dynamic>> getSiteSettings() async {
+    final doc = await _firestore
+        .collection(_siteSettingsCollection)
+        .doc(_siteSettingsDocId)
+        .get();
+    
+    if (!doc.exists) {
+      // Return empty values if document doesn't exist
+      return {
+        'siteName': '',
+        'siteDescription': '',
+        'email': '',
+        'phone': '',
+        'address': '',
+        'copyright': '',
+      };
+    }
+    
+    return doc.data()!;
+  }
+
+  // Stream site settings
+  Stream<Map<String, dynamic>> getSiteSettingsStream() {
+    return _firestore
+        .collection(_siteSettingsCollection)
+        .doc(_siteSettingsDocId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) {
+        return {
+          'siteName': '',
+          'siteDescription': '',
+          'email': '',
+          'phone': '',
+          'address': '',
+          'copyright': '',
+        };
+      }
+      return snapshot.data()!;
+    });
+  }
+
+  // Update site settings
+  Future<void> updateSiteSettings(Map<String, dynamic> settings) async {
+    await _firestore
+        .collection(_siteSettingsCollection)
+        .doc(_siteSettingsDocId)
         .set(settings, SetOptions(merge: true));
   }
 

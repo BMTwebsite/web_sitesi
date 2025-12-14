@@ -1,209 +1,269 @@
 import 'package:flutter/material.dart';
+import '../services/firestore_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Footer extends StatelessWidget {
   const Footer({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
-      color: const Color(0xFF0A1929),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Column 1: Community Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2196F3),
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: const Icon(
-                            Icons.memory,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: Text(
-                            'Bilgisayar Mühendisliği Topluluğu',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+    final firestoreService = FirestoreService();
+    
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: firestoreService.getSiteSettingsStream(),
+      builder: (context, snapshot) {
+        final siteSettings = snapshot.data ?? {};
+        final siteName = siteSettings['siteName'] ?? '';
+        final siteDescription = siteSettings['siteDescription'] ?? '';
+        final email = siteSettings['email'] ?? '';
+        final phone = siteSettings['phone'] ?? '';
+        final address = siteSettings['address'] ?? '';
+        final copyright = siteSettings['copyright'] ?? '';
+        
+        return StreamBuilder<Map<String, dynamic>>(
+          stream: firestoreService.getContactSettingsStream(),
+          builder: (context, contactSnapshot) {
+            final contactSettings = contactSnapshot.data ?? {};
+            final socialMedia = contactSettings['socialMedia'] as List<dynamic>? ?? [];
+            
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+              color: const Color(0xFF0A1929),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Column 1: Community Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2196F3),
+                                    borderRadius: BorderRadius.circular(25),
+                                  ),
+                                  child: const Icon(
+                                    Icons.memory,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: Text(
+                                    siteName.isNotEmpty ? siteName : 'Site Adı',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
+                                  ),
+                                ),
+                              ],
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: true,
+                            if (siteDescription.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                siteDescription,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                            if (copyright.isNotEmpty) ...[
+                              const SizedBox(height: 30),
+                              Text(
+                                copyright,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      // Column 2: Contact Info
+                      if (email.isNotEmpty || phone.isNotEmpty || address.isNotEmpty)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'İletişim Bilgileri',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              if (email.isNotEmpty)
+                                _ContactItem(
+                                  icon: Icons.email,
+                                  text: email,
+                                  onTap: () async {
+                                    final Uri emailUri = Uri(
+                                      scheme: 'mailto',
+                                      path: email,
+                                    );
+                                    if (await canLaunchUrl(emailUri)) {
+                                      await launchUrl(emailUri);
+                                    }
+                                  },
+                                ),
+                              if (email.isNotEmpty && phone.isNotEmpty) const SizedBox(height: 12),
+                              if (phone.isNotEmpty)
+                                _ContactItem(
+                                  icon: Icons.phone,
+                                  text: phone,
+                                  onTap: () async {
+                                    final Uri phoneUri = Uri(
+                                      scheme: 'tel',
+                                      path: phone,
+                                    );
+                                    if (await canLaunchUrl(phoneUri)) {
+                                      await launchUrl(phoneUri);
+                                    }
+                                  },
+                                ),
+                              if (phone.isNotEmpty && address.isNotEmpty) const SizedBox(height: 12),
+                              if (address.isNotEmpty)
+                                _ContactItem(
+                                  icon: Icons.location_on,
+                                  text: address,
+                                ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Teknoloji ve inovasyonun buluşma noktası. Geleceği birlikte kodluyoruz.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    const Text(
-                      '© 2025 Bilgisayar Mühendisliği Topluluğu. Tüm hakları saklıdır.',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Column 2: Contact Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'İletişim Bilgileri',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _ContactItem(
-                      icon: Icons.email,
-                      text: 'info@bmt.edu.tr',
-                    ),
-                    const SizedBox(height: 12),
-                    _ContactItem(
-                      icon: Icons.phone,
-                      text: '+90 (212) 555 0123',
-                    ),
-                    const SizedBox(height: 12),
-                    _ContactItem(
-                      icon: Icons.location_on,
-                      text: 'Bandırma Onyedi Eylül Üniversitesi',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              // Column 3: Social Media
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Bizi Takip Edin',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        _SocialIcon(Icons.facebook),
-                        const SizedBox(width: 12),
-                        _SocialIcon(Icons.circle, icon: Icons.close), // Twitter placeholder
-                        const SizedBox(width: 12),
-                        _SocialIcon(Icons.camera_alt), // Instagram placeholder
-                        const SizedBox(width: 12),
-                        _SocialIcon(Icons.business), // LinkedIn placeholder
-                        const SizedBox(width: 12),
-                        _SocialIcon(Icons.code), // GitHub placeholder
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            'Gizlilik Politikası',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ),
+                      if (socialMedia.isNotEmpty) ...[
                         const SizedBox(width: 20),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            'Kullanım Şartları',
-                            style: TextStyle(color: Colors.white70),
+                        // Column 3: Social Media
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Bizi Takip Edin',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: socialMedia.map((item) {
+                                  final data = item as Map<String, dynamic>;
+                                  final url = data['url'] as String? ?? '';
+                                  final iconName = data['icon'] as String? ?? 'link';
+                                  final colorHex = data['color'] as String? ?? '#2196F3';
+                                  
+                                  return GestureDetector(
+                                    onTap: url.isNotEmpty ? () async {
+                                      final Uri uri = Uri.parse(url);
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      }
+                                    } : null,
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Color(int.parse(colorHex.replaceFirst('#', '0xFF'))),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Icon(
+                                        _getIconData(iconName),
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'camera_alt':
+        return Icons.camera_alt;
+      case 'business':
+        return Icons.business;
+      case 'play_circle_filled':
+        return Icons.play_circle_filled;
+      case 'music_note':
+        return Icons.music_note;
+      case 'link':
+        return Icons.link;
+      case 'facebook':
+        return Icons.facebook;
+      case 'language':
+        return Icons.language;
+      default:
+        return Icons.link;
+    }
   }
 }
 
 class _ContactItem extends StatelessWidget {
   final IconData icon;
   final String text;
+  final VoidCallback? onTap;
 
-  const _ContactItem({required this.icon, required this.text});
+  const _ContactItem({
+    required this.icon,
+    required this.text,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 20),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white70, size: 20),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: onTap != null ? Colors.white : Colors.white70,
+                fontSize: 14,
+                decoration: onTap != null ? TextDecoration.underline : null,
+              ),
+            ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SocialIcon extends StatelessWidget {
-  final IconData iconData;
-  final IconData? icon;
-
-  const _SocialIcon(this.iconData, {this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Icon(
-        icon ?? iconData,
-        color: Colors.white,
-        size: 20,
+        ],
       ),
     );
   }

@@ -54,3 +54,8 @@ functions/.env
 .env.local
 node_modules/
 functions/node_modules/
+
+# Firebase Service Account Keys (GÜVENLİK - ASLA GİT'E EKLEMEYİN!)
+serviceAccountKey.json
+**/serviceAccountKey.json
+scripts/serviceAccountKey.json

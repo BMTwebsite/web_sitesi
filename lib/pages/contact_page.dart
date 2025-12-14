@@ -34,45 +34,43 @@ class _ContactContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
 
   List<SocialMedia> _parseSocialMedia(List<dynamic>? socialMediaData) {
-    if (socialMediaData == null) {
-      return _getDefaultSocialMedia();
+    // Eğer admin sosyal medya eklemişse onları kullan
+    if (socialMediaData != null && socialMediaData.isNotEmpty) {
+      return socialMediaData.map((item) {
+        final data = item as Map<String, dynamic>;
+        return SocialMedia(
+          name: data['name'] ?? '',
+          icon: _getIconData(data['icon'] ?? 'link'),
+          url: data['url'] ?? '',
+          color: _parseColor(data['color'] ?? '#2196F3'),
+        );
+      }).toList();
     }
-
-    return socialMediaData.map((item) {
-      final data = item as Map<String, dynamic>;
-      return SocialMedia(
-        name: data['name'] ?? '',
-        icon: _getIconData(data['icon'] ?? 'link'),
-        url: data['url'] ?? '',
-        color: _parseColor(data['color'] ?? '#2196F3'),
-      );
-    }).toList();
-  }
-
-  List<SocialMedia> _getDefaultSocialMedia() {
+    
+    // Placeholder sosyal medya kartları (linkler boş)
     return [
       SocialMedia(
         name: 'Instagram',
         icon: Icons.camera_alt,
-        url: 'https://www.instagram.com/banubmt?igsh=MmtvemV2YWtqYzVu',
+        url: '', // Boş - admin dolduracak
         color: const Color(0xFFE4405F),
       ),
       SocialMedia(
         name: 'LinkedIn',
         icon: Icons.business,
-        url: 'https://www.linkedin.com/company/banubmt/',
+        url: '', // Boş - admin dolduracak
         color: const Color(0xFF0077B5),
       ),
       SocialMedia(
         name: 'YouTube',
         icon: Icons.play_circle_filled,
-        url: 'https://youtube.com/@banubmt?si=w6Qi4NEKYoOmUZmz',
+        url: '', // Boş - admin dolduracak
         color: const Color(0xFFFF0000),
       ),
       SocialMedia(
         name: 'TikTok',
         icon: Icons.music_note,
-        url: 'https://www.tiktok.com/@banubmt',
+        url: '', // Boş - admin dolduracak
         color: const Color(0xFF000000),
       ),
     ];
@@ -176,7 +174,7 @@ class _ContactContent extends StatelessWidget {
           StreamBuilder<Map<String, dynamic>>(
             stream: _firestoreService.getContactSettingsStream(),
             builder: (context, snapshot) {
-              final email = snapshot.data?['email'] ?? 'info@bmt.edu.tr';
+              final email = snapshot.data?['email'] ?? '';
               final socialMediaList = _parseSocialMedia(
                 snapshot.data?['socialMedia'],
               );
@@ -195,38 +193,47 @@ class _ContactContent extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        _ContactInfoCard(
-                          icon: Icons.email,
-                          title: 'E-posta',
-                          content: email,
-                          color: const Color(0xFF2196F3),
-                          onTap: () async {
-                            final Uri emailUri = Uri(
-                              scheme: 'mailto',
-                              path: email,
-                            );
-                            if (await canLaunchUrl(emailUri)) {
-                              await launchUrl(emailUri);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        _ContactInfoCard(
-                          icon: Icons.location_on,
-                          title: 'Adres',
-                          content:
-                              'Bandırma Onyedi Eylül Üniversitesi\nBilgisayar Mühendisliği Bölümü\nBandırma, Balıkesir',
-                          color: const Color(0xFFF44336),
-                          onTap: () async {
-                            final Uri mapUri = Uri.parse(
-                              'https://www.google.com/maps/search/?api=1&query=Bandırma+Onyedi+Eylül+Üniversitesi',
-                            );
-                            if (await canLaunchUrl(mapUri)) {
-                              await launchUrl(
-                                mapUri,
-                                mode: LaunchMode.externalApplication,
+                        if (email.isNotEmpty)
+                          _ContactInfoCard(
+                            icon: Icons.email,
+                            title: 'E-posta',
+                            content: email,
+                            color: const Color(0xFF2196F3),
+                            onTap: () async {
+                              final Uri emailUri = Uri(
+                                scheme: 'mailto',
+                                path: email,
                               );
-                            }
+                              if (await canLaunchUrl(emailUri)) {
+                                await launchUrl(emailUri);
+                              }
+                            },
+                          ),
+                        if (email.isNotEmpty) const SizedBox(height: 20),
+                        const SizedBox(height: 20),
+                        StreamBuilder<Map<String, dynamic>>(
+                          stream: _firestoreService.getSiteSettingsStream(),
+                          builder: (context, siteSnapshot) {
+                            final address = siteSnapshot.data?['address'] ?? '';
+                            if (address.isEmpty) return const SizedBox.shrink();
+                            
+                            return _ContactInfoCard(
+                              icon: Icons.location_on,
+                              title: 'Adres',
+                              content: address,
+                              color: const Color(0xFFF44336),
+                              onTap: () async {
+                                final Uri mapUri = Uri.parse(
+                                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+                                );
+                                if (await canLaunchUrl(mapUri)) {
+                                  await launchUrl(
+                                    mapUri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                }
+                              },
+                            );
                           },
                         ),
                         const SizedBox(height: 40),
@@ -280,38 +287,46 @@ class _ContactContent extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 30),
-                              _ContactInfoCard(
-                                icon: Icons.email,
-                                title: 'E-posta',
-                                content: email,
-                                color: const Color(0xFF2196F3),
-                                onTap: () async {
-                                  final Uri emailUri = Uri(
-                                    scheme: 'mailto',
-                                    path: email,
-                                  );
-                                  if (await canLaunchUrl(emailUri)) {
-                                    await launchUrl(emailUri);
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 20),
-                              _ContactInfoCard(
-                                icon: Icons.location_on,
-                                title: 'Adres',
-                                content:
-                                    'Bandırma Onyedi Eylül Üniversitesi\nBilgisayar Mühendisliği Bölümü\nBandırma, Balıkesir',
-                                color: const Color(0xFFF44336),
-                                onTap: () async {
-                                  final Uri mapUri = Uri.parse(
-                                    'https://www.google.com/maps/search/?api=1&query=Bandırma+Onyedi+Eylül+Üniversitesi',
-                                  );
-                                  if (await canLaunchUrl(mapUri)) {
-                                    await launchUrl(
-                                      mapUri,
-                                      mode: LaunchMode.externalApplication,
+                              if (email.isNotEmpty)
+                                _ContactInfoCard(
+                                  icon: Icons.email,
+                                  title: 'E-posta',
+                                  content: email,
+                                  color: const Color(0xFF2196F3),
+                                  onTap: () async {
+                                    final Uri emailUri = Uri(
+                                      scheme: 'mailto',
+                                      path: email,
                                     );
-                                  }
+                                    if (await canLaunchUrl(emailUri)) {
+                                      await launchUrl(emailUri);
+                                    }
+                                  },
+                                ),
+                              if (email.isNotEmpty) const SizedBox(height: 20),
+                              StreamBuilder<Map<String, dynamic>>(
+                                stream: _firestoreService.getSiteSettingsStream(),
+                                builder: (context, siteSnapshot) {
+                                  final address = siteSnapshot.data?['address'] ?? '';
+                                  if (address.isEmpty) return const SizedBox.shrink();
+                                  
+                                  return _ContactInfoCard(
+                                    icon: Icons.location_on,
+                                    title: 'Adres',
+                                    content: address,
+                                    color: const Color(0xFFF44336),
+                                    onTap: () async {
+                                      final Uri mapUri = Uri.parse(
+                                        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+                                      );
+                                      if (await canLaunchUrl(mapUri)) {
+                                        await launchUrl(
+                                          mapUri,
+                                          mode: LaunchMode.externalApplication,
+                                        );
+                                      }
+                                    },
+                                  );
                                 },
                               ),
                             ],
@@ -423,9 +438,13 @@ class _ContactContent extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () async {
+                            final contactData = await _firestoreService.getContactSettings();
+                            final email = contactData['email'] ?? '';
+                            if (email.isEmpty) return;
+                            
                             final Uri emailUri = Uri(
                               scheme: 'mailto',
-                              path: 'info@bmt.edu.tr',
+                              path: email,
                               query: 'subject=İletişim Formu',
                             );
                             if (await canLaunchUrl(emailUri)) {
@@ -655,13 +674,15 @@ class _SocialMediaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasUrl = socialMedia.url.isNotEmpty;
+    
     return InkWell(
-      onTap: () async {
+      onTap: hasUrl ? () async {
         final Uri uri = Uri.parse(socialMedia.url);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
-      },
+      } : null, // URL boşsa tıklanamaz
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
@@ -686,14 +707,27 @@ class _SocialMediaCard extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               socialMedia.name,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: hasUrl ? Colors.white : Colors.white54, // URL boşsa daha soluk
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            const Icon(Icons.arrow_forward, color: Colors.white54, size: 16),
+            if (!hasUrl) // URL boşsa bilgi metni göster
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Link eklenmedi',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            if (hasUrl) ...[
+              const SizedBox(height: 8),
+              const Icon(Icons.arrow_forward, color: Colors.white54, size: 16),
+            ],
           ],
         ),
       ),

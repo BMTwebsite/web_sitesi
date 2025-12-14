@@ -45,12 +45,10 @@ class BMTApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/home': (context) => const HomePage(),
-        '/events': (context) => const EventsPage(),
-        '/about': (context) => const AboutPage(),
         '/': (context) => const HomePage(),
         '/home': (context) => const HomePage(),
         '/events': (context) => const EventsPage(),
+        '/about': (context) => const AboutPage(),
         '/contact': (context) => const ContactPage(),
         '/admin-login': (context) => const AdminLoginPage(),
         '/admin-register': (context) => const AdminRegisterPage(),

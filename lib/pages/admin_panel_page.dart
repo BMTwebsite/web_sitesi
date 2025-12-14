@@ -43,7 +43,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                           OutlinedButton.icon(
                             onPressed: () => _clearPendingAdmins(context),
                             icon: const Icon(Icons.delete_sweep),
-                            label: const Text('Eski Onay Taleplerini Temizle'),
+                            label: const Text('Bekleyen Onay Maillerini Sıfırla'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.orange,
                               side: const BorderSide(color: Colors.orange),
@@ -87,16 +87,23 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       ),
                       const SizedBox(width: 16),
                       _TabButton(
-                        label: 'İletişim Ayarları',
+                        label: 'Site Ayarları',
                         isSelected: _selectedTab == 1,
                         onTap: () => setState(() => _selectedTab = 1),
+                      ),
+                      const SizedBox(width: 16),
+                      _TabButton(
+                        label: 'İletişim Ayarları',
+                        isSelected: _selectedTab == 2,
+                        onTap: () => setState(() => _selectedTab = 2),
                       ),
                     ],
                   ),
                   const SizedBox(height: 30),
                   // Tab Content
                   if (_selectedTab == 0) _buildEventsTab(),
-                  if (_selectedTab == 1) _buildContactSettingsTab(),
+                  if (_selectedTab == 1) _buildSiteSettingsTab(),
+                  if (_selectedTab == 2) _buildContactSettingsTab(),
                 ],
               ),
             ),
@@ -174,6 +181,31 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildSiteSettingsTab() {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: _firestoreService.getSiteSettingsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Hata: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final settings = snapshot.data ?? {};
+        return _SiteSettingsEditor(settings: settings);
+      },
     );
   }
 
@@ -814,7 +846,7 @@ class _ContactSettingsEditorState extends State<_ContactSettingsEditor> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(
-      text: widget.settings['email'] ?? 'info@bmt.edu.tr',
+      text: widget.settings['email'] ?? '',
     );
     _socialMediaList = List<Map<String, dynamic>>.from(
       widget.settings['socialMedia'] ?? [],
@@ -1199,6 +1231,307 @@ class _SocialMediaItemState extends State<_SocialMediaItem> {
         return Icons.language;
       default:
         return Icons.link;
+    }
+  }
+}
+
+class _SiteSettingsEditor extends StatefulWidget {
+  final Map<String, dynamic> settings;
+
+  const _SiteSettingsEditor({required this.settings});
+
+  @override
+  State<_SiteSettingsEditor> createState() => _SiteSettingsEditorState();
+}
+
+class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
+  late TextEditingController _siteNameController;
+  late TextEditingController _siteDescriptionController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  late TextEditingController _addressController;
+  late TextEditingController _copyrightController;
+  final _firestoreService = FirestoreService();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _siteNameController = TextEditingController(
+      text: widget.settings['siteName'] ?? '',
+    );
+    _siteDescriptionController = TextEditingController(
+      text: widget.settings['siteDescription'] ?? '',
+    );
+    _emailController = TextEditingController(
+      text: widget.settings['email'] ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.settings['phone'] ?? '',
+    );
+    _addressController = TextEditingController(
+      text: widget.settings['address'] ?? '',
+    );
+    _copyrightController = TextEditingController(
+      text: widget.settings['copyright'] ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _siteNameController.dispose();
+    _siteDescriptionController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _copyrightController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Site Adı',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _siteNameController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Site Adı',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text(
+            'Site Açıklaması',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _siteDescriptionController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Site Açıklaması',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text(
+            'İletişim Bilgileri',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _emailController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+              labelText: 'E-posta',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _phoneController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: 'Telefon',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _addressController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Adres',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text(
+            'Telif Hakkı',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _copyrightController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Telif Hakkı Metni (örn: © 2025 BMT. Tüm hakları saklıdır.)',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _saveSettings,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Ayarları Kaydet',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveSettings() async {
+    setState(() => _isSaving = true);
+
+    try {
+      await _firestoreService.updateSiteSettings({
+        'siteName': _siteNameController.text.trim(),
+        'siteDescription': _siteDescriptionController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'address': _addressController.text.trim(),
+        'copyright': _copyrightController.text.trim(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Site ayarları başarıyla kaydedildi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 }
