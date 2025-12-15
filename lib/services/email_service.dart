@@ -97,11 +97,10 @@ class EmailService {
 
   // Verification link oluştur
   static String createVerificationLink(String token) {
-    // Web uygulamanızın URL'ini buraya ekleyin
-    // Production için: https://your-domain.com/#/admin-verify?token=$token
-    // Development için: http://localhost:5000/#/admin-verify?token=$token
-    // Flutter web hash routing kullanıyor, bu yüzden # kullanıyoruz
-    return 'https://${Secrets.firebaseAuthDomain}/#/admin-verify?token=$token';
+    // Firebase Cloud Function HTTP endpoint'ine yönlendir
+    // Bu endpoint onay işlemini yapacak ve HTML sayfası döndürecek
+    // Kullanıcı web sayfası açmadan direkt onaylanacak
+    return 'https://us-central1-${Secrets.firebaseProjectId}.cloudfunctions.net/verifyAdmin?token=$token';
   }
 }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import 'dart:html' as html show window;
+import 'admin_verify_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,7 +16,112 @@ class _HomePageState extends State<HomePage> {
   final _eventsKey = GlobalKey();
 
   @override
+  void initState() {
+    super.initState();
+    // Web'de URL kontrolü yap
+    if (kIsWeb) {
+      // Hemen kontrol et
+      _checkVerificationToken();
+      // PostFrameCallback ile de kontrol et (güvenlik için)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkVerificationToken();
+      });
+    }
+  }
+
+  void _checkVerificationToken() {
+    if (!mounted) return;
+    
+    try {
+      final hash = html.window.location.hash;
+      final fullUrl = html.window.location.href;
+      final search = html.window.location.search ?? '';
+      
+      print('🔍 HomePage - URL kontrolü başlatılıyor...');
+      print('🔍 HomePage - Hash: $hash');
+      print('🔍 HomePage - Search: $search');
+      print('🔍 HomePage - Full URL: $fullUrl');
+      
+      String? token;
+      
+      // Yöntem 1: Hash'ten token parse et
+      if (hash.isNotEmpty) {
+        if (hash.contains('/admin-verify') && hash.contains('token=')) {
+          print('✅ HomePage - Admin verify linki hash\'te tespit edildi');
+          final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+          if (tokenMatch != null && tokenMatch.group(1) != null) {
+            token = Uri.decodeComponent(tokenMatch.group(1)!);
+            print('✅ HomePage - Token hash\'ten bulundu: $token');
+          }
+        }
+      }
+      
+      // Yöntem 2: Search'ten token parse et
+      if ((token == null || token.isEmpty) && search.isNotEmpty) {
+        try {
+          final searchUri = Uri.parse(search);
+          token = searchUri.queryParameters['token'];
+          if (token != null && token.isNotEmpty) {
+            print('✅ HomePage - Token search\'ten bulundu: $token');
+          }
+        } catch (e) {
+          print('⚠️ HomePage - Search parse hatası: $e');
+        }
+      }
+      
+      // Yöntem 3: Full URL'den token parse et
+      if (token == null || token.isEmpty) {
+        try {
+          final fullUri = Uri.parse(fullUrl);
+          token = fullUri.queryParameters['token'];
+          if (token != null && token.isNotEmpty) {
+            print('✅ HomePage - Token full URL\'den bulundu: $token');
+          }
+        } catch (e) {
+          print('⚠️ HomePage - Full URL parse hatası: $e');
+        }
+      }
+      
+      // Token bulunduysa AdminVerifyPage'e yönlendir
+      if (token != null && token.isNotEmpty) {
+        print('✅ HomePage - Token bulundu, AdminVerifyPage\'e yönlendiriliyor: $token');
+        // Hemen yönlendir (microtask yerine direkt)
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => AdminVerifyPage(token: token),
+            ),
+            (route) => false, // Tüm önceki route'ları temizle
+          );
+        }
+      } else {
+        print('⚠️ HomePage - Token bulunamadı');
+      }
+    } catch (e, stackTrace) {
+      print('❌ HomePage - URL kontrolü hatası: $e');
+      print('📚 Stack trace: $stackTrace');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
+    if (kIsWeb) {
+      try {
+        final hash = html.window.location.hash;
+        if (hash.contains('/admin-verify') && hash.contains('token=')) {
+          final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+          if (tokenMatch != null && tokenMatch.group(1) != null) {
+            final token = Uri.decodeComponent(tokenMatch.group(1)!);
+            print('✅ HomePage build - Token bulundu, AdminVerifyPage döndürülüyor: $token');
+            return AdminVerifyPage(token: token);
+          }
+        }
+      } catch (e) {
+        print('⚠️ HomePage build hash kontrolü hatası: $e');
+      }
+    }
+    
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(

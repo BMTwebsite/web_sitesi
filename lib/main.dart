@@ -65,6 +65,30 @@ void main() async {
   runApp(BMTApp(firebaseInitialized: firebaseInitialized));
 }
 
+// Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
+Widget? _getHomeWidget() {
+  if (!kIsWeb) return null;
+  
+  try {
+    final hash = html.window.location.hash;
+    print('🔍 _getHomeWidget - Hash kontrolü: $hash');
+    
+    if (hash.contains('/admin-verify') && hash.contains('token=')) {
+      print('✅ _getHomeWidget - Admin verify linki tespit edildi');
+      final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+      if (tokenMatch != null && tokenMatch.group(1) != null) {
+        final token = Uri.decodeComponent(tokenMatch.group(1)!);
+        print('✅ _getHomeWidget - Token bulundu, AdminVerifyPage döndürülüyor: $token');
+        return AdminVerifyPage(token: token);
+      }
+    }
+  } catch (e) {
+    print('⚠️ _getHomeWidget hash kontrolü hatası: $e');
+  }
+  
+  return null;
+}
+
 class BMTApp extends StatelessWidget {
   final bool firebaseInitialized;
   
@@ -160,9 +184,10 @@ class BMTApp extends StatelessWidget {
           ),
           scaffoldBackgroundColor: const Color(0xFF0A1929),
         ),
-        initialRoute: '/',
-      routes: {
-        '/': (context) => const HomePage(),
+        // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
+        home: kIsWeb ? (_getHomeWidget() ?? const HomePage()) : const HomePage(),
+        routes: {
+        // '/' route'u kaldırıldı çünkü home property kullanılıyor
         '/home': (context) => const HomePage(),
         '/events': (context) => const EventsPage(),
         '/about': (context) => const AboutPage(),
@@ -277,6 +302,38 @@ class BMTApp extends StatelessWidget {
         },
       },
       onGenerateRoute: (settings) {
+        print('🔍 onGenerateRoute çağrıldı: ${settings.name}');
+        
+        // Web'de hash routing kontrolü
+        if (kIsWeb) {
+          try {
+            final hash = html.window.location.hash;
+            final fullUrl = html.window.location.href;
+            
+            print('🔍 onGenerateRoute - Hash: $hash');
+            print('🔍 onGenerateRoute - Full URL: $fullUrl');
+            
+            // Eğer hash'te admin-verify varsa
+            if (hash.contains('/admin-verify') && hash.contains('token=')) {
+              print('✅ onGenerateRoute - Admin verify linki tespit edildi');
+              
+              // Token'ı parse et
+              String? token;
+              final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+              if (tokenMatch != null && tokenMatch.group(1) != null) {
+                token = Uri.decodeComponent(tokenMatch.group(1)!);
+                print('✅ onGenerateRoute - Token bulundu: $token');
+                
+                return MaterialPageRoute(
+                  builder: (context) => AdminVerifyPage(token: token),
+                );
+              }
+            }
+          } catch (e) {
+            print('⚠️ onGenerateRoute hash kontrolü hatası: $e');
+          }
+        }
+        
         // Handle /verify?token=xxx route
         if (settings.name == '/verify') {
           final uri = Uri.parse(

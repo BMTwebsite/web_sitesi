@@ -1,24 +1,105 @@
 // Firebase Cloud Functions - Email Gönderme
-// Firebase Extensions - Trigger Email kullanarak
+// Gmail SMTP kullanarak direkt email gönderir
 // 
-// Bu sistem Firestore'a mail koleksiyonuna doküman ekler
-// Firebase Extensions - Trigger Email extension'ı otomatik olarak e-posta gönderir
-// 
-// Extension Kurulumu:
-// 1. Firebase Console > Extensions > Browse > "Trigger Email" arayın
-// 2. Extension'ı kurun (SendGrid veya Mailgun seçebilirsiniz)
-// 3. API key'leri Firebase Console'dan ayarlayın (kodda şifre yok!)
+// Kurulum:
+// 1. Gmail App Password oluşturun (Google Hesabınız > Güvenlik > 2 Adımlı Doğrulama > Uygulama şifreleri)
+// 2. Firebase Console > Functions > Configuration > Environment variables
+// 3. GMAIL_USER ve GMAIL_APP_PASSWORD değişkenlerini ekleyin
 // 4. Deploy edin: firebase deploy --only functions
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 admin.initializeApp();
 
-// SendGrid API key'i Firebase Functions config'den al
-// Kurulum: firebase functions:config:set sendgrid.key="YOUR_API_KEY"
-sgMail.setApiKey(functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY || '');
+// Gmail SMTP transporter oluştur
+// Environment variables'dan Gmail bilgilerini al
+const createTransporter = () => {
+  try {
+    console.log('🔍 Gmail bilgileri alınıyor...');
+    
+    // Önce environment variables'dan dene (Google Cloud Console'dan ayarlanan)
+    let gmailUser = process.env.GMAIL_USER;
+    let gmailPassword = process.env.GMAIL_APP_PASSWORD;
+    
+    console.log('📦 Environment variables kontrol:');
+    console.log('   GMAIL_USER:', gmailUser ? 'VAR' : 'YOK');
+    console.log('   GMAIL_APP_PASSWORD:', gmailPassword ? 'VAR' : 'YOK');
+    
+    // Eğer environment variable'da yoksa, functions.config()'den dene
+    if (!gmailUser || !gmailPassword) {
+      console.log('📦 functions.config() kontrol ediliyor...');
+      try {
+        const config = functions.config();
+        console.log('📦 Config objesi:', config ? 'VAR' : 'YOK');
+        if (config) {
+          console.log('📦 Config keys:', Object.keys(config));
+          if (config.gmail) {
+            console.log('📦 Config.gmail:', config.gmail ? 'VAR' : 'YOK');
+            if (config.gmail) {
+              console.log('📦 Config.gmail keys:', Object.keys(config.gmail));
+              gmailUser = gmailUser || config.gmail.user;
+              gmailPassword = gmailPassword || config.gmail.password;
+              console.log('📦 Config\'den alındı:');
+              console.log('   User:', gmailUser ? `${gmailUser.substring(0, 5)}***` : 'YOK');
+              console.log('   Password:', gmailPassword ? 'VAR (' + gmailPassword.length + ' karakter)' : 'YOK');
+            }
+          } else {
+            console.warn('⚠️ Config.gmail bulunamadı!');
+          }
+        }
+      } catch (configError) {
+        console.error('❌ functions.config() hatası:', configError);
+        console.error('📚 Error details:', {
+          message: configError.message,
+          stack: configError.stack
+        });
+      }
+    }
+    
+    console.log('🔍 Final Gmail bilgileri:');
+    console.log('📧 Gmail User:', gmailUser ? `${gmailUser.substring(0, 5)}*** (${gmailUser.length} karakter)` : 'BULUNAMADI');
+    console.log('🔑 Gmail Password:', gmailPassword ? `VAR (${gmailPassword.length} karakter)` : 'BULUNAMADI');
+    
+    if (!gmailUser || !gmailPassword) {
+      console.error('❌ Gmail bilgileri bulunamadı!');
+      console.error('💡 Gmail bilgilerini ayarlamak için:');
+      console.error('   Terminal: firebase functions:config:set gmail.user="your-email@gmail.com" gmail.password="your-app-password"');
+      console.error('   Sonra: firebase deploy --only functions');
+      return null;
+    }
+    
+    // Trim ve kontrol
+    const trimmedUser = gmailUser.trim();
+    const trimmedPassword = gmailPassword.trim();
+    
+    console.log('🔍 Trimmed bilgiler:');
+    console.log('📧 User:', trimmedUser.substring(0, 5) + '*** (' + trimmedUser.length + ' karakter)');
+    console.log('🔑 Password:', trimmedPassword.length + ' karakter');
+    
+    // Nodemailer transporter oluştur
+    console.log('📤 Nodemailer transporter oluşturuluyor...');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: trimmedUser,
+        pass: trimmedPassword
+      }
+    });
+    
+    console.log('✅ Transporter oluşturuldu');
+    return transporter;
+  } catch (error) {
+    console.error('❌ Transporter oluşturma hatası:', error);
+    console.error('📚 Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
+    return null;
+  }
+};
 
 // Email gönderme fonksiyonu - Firebase Extensions (Trigger Email) kullanarak
 // Bu fonksiyon Firestore'a mail koleksiyonuna doküman ekler
@@ -160,99 +241,188 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     console.log('🔗 Link:', link);
     console.log('📧 Gönderen:', fromEmail);
     
-    // SendGrid API key kontrolü
-    const sendGridApiKey = functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY;
-    if (!sendGridApiKey) {
-      console.warn('⚠️ SendGrid API key bulunamadı, Firestore\'a yazılıyor (Extension kullanılacak)');
+    // Gönderen email adresini belirle
+    let sendFromEmail = siteEmail || 'onay@bmt.edu.tr'; // Varsayılan email
+    let sendFromName = siteName;
+    
+    // Resend'i geçici olarak devre dışı bırak (verified domain gerekli)
+    // Önce Resend'i dene (daha güvenilir)
+    const resendApiKey = process.env.RESEND_API_KEY || functions.config()?.resend?.api_key;
+    const useResend = false; // Geçici olarak devre dışı - verified domain gerekli
+    
+    if (resendApiKey && useResend) {
+      console.log('📤 Resend API ile email gönderiliyor...');
+      console.log('🔑 Resend API Key:', resendApiKey.substring(0, 10) + '***');
+      console.log('📧 From:', `${sendFromName} <${sendFromEmail}>`);
+      console.log('📬 To:', to);
       
-      // SendGrid yoksa eski yöntemle Firestore'a yaz (Extension için)
-      const mailData = {
-        to: to,
-        message: {
+      try {
+        const resend = new Resend(resendApiKey);
+        
+        const result = await resend.emails.send({
+          from: `${sendFromName} <${sendFromEmail}>`,
+          to: to,
           subject: subject || `${siteName} Onay Maili`,
           html: emailHtml,
           text: emailText,
-        },
-      };
-      
-      const docRef = await db.collection('mail').add(mailData);
-      console.log('✅ Email Firestore\'a eklendi (Extension gönderecek):', docRef.id);
-      
-      return { 
-        success: true,
-        messageId: docRef.id,
-        message: 'Email Firestore\'a eklendi, Extension gönderecek'
-      };
-    }
-    
-    // SendGrid ile direkt email gönder
-    console.log('📤 SendGrid ile direkt email gönderiliyor...');
-    
-    // From email'i düzelt (SendGrid formatı)
-    let sendFromEmail = siteEmail || 'noreply@bmt-web-41790.firebaseapp.com';
-    if (fromEmail.includes('<')) {
-      // "Site Name <email@domain.com>" formatından email'i çıkar
-      const match = fromEmail.match(/<([^>]+)>/);
-      if (match) {
-        sendFromEmail = match[1];
+          ...(siteEmail && { reply_to: siteEmail }),
+        });
+        
+        console.log('📥 Resend response:', JSON.stringify(result, null, 2));
+        console.log('📧 Result data:', result.data);
+        console.log('📧 Result error:', result.error);
+        
+        if (result.error) {
+          console.error('❌ Resend API hatası:', result.error);
+          throw new Error(`Resend API hatası: ${JSON.stringify(result.error)}`);
+        }
+        
+        if (!result.data || !result.data.id) {
+          console.error('❌ Resend response\'da data veya id yok!');
+          console.error('📥 Full response:', result);
+          throw new Error('Resend API\'den geçersiz yanıt alındı');
+        }
+        
+        console.log('✅ Email Resend ile başarıyla gönderildi!');
+        console.log('📧 Message ID:', result.data.id);
+        
+        // Firestore'a log olarak kaydet
+        try {
+          await db.collection('mail_logs').add({
+            to: to,
+            subject: subject || `${siteName} Onay Maili`,
+            messageId: result.data.id || 'unknown',
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            status: 'sent',
+            via: 'resend',
+          });
+        } catch (firestoreError) {
+          console.warn('⚠️ Firestore log kaydı yapılamadı (önemli değil):', firestoreError);
+        }
+        
+        return {
+          success: true,
+          messageId: result.data.id,
+          message: 'Email başarıyla gönderildi',
+          sentVia: 'resend'
+        };
+      } catch (resendError) {
+        console.error('❌ Resend hatası:', resendError);
+        console.error('📚 Error details:', {
+          message: resendError.message,
+          stack: resendError.stack,
+          response: resendError.response
+        });
+        console.log('🔄 Gmail SMTP\'ye geçiliyor...');
+        // Resend başarısız olursa Gmail'e geç
       }
     }
     
-    const msg = {
+    // Gmail SMTP transporter oluştur (fallback)
+    console.log('📤 Gmail SMTP ile email gönderiliyor...');
+    const transporter = createTransporter();
+    
+    if (!transporter) {
+      throw new Error('Email servisi yapılandırılamadı. Resend API key veya Gmail bilgileri eksik.');
+    }
+    
+    // Gmail kullanırken "from" adresi MUTLAKA Gmail user olmalı
+    // App Password'un oluşturulduğu hesap ile aynı olmalı
+    let gmailUser = process.env.GMAIL_USER;
+    if (!gmailUser) {
+      try {
+        const config = functions.config();
+        if (config && config.gmail && config.gmail.user) {
+          gmailUser = config.gmail.user;
+        }
+      } catch (configError) {
+        console.warn('⚠️ functions.config() hatası:', configError);
+      }
+    }
+    
+    if (!gmailUser) {
+      throw new Error('Gmail user bulunamadı. GMAIL_USER ayarlanmalı.');
+    }
+    
+    // Gmail için "from" adresi Gmail user olmalı (App Password ile aynı hesap)
+    sendFromEmail = gmailUser;
+    console.log('📧 Gmail "from" adresi (App Password ile aynı hesap):', sendFromEmail);
+    
+    console.log('📧 Mail options:');
+    console.log('   From:', `${sendFromName} <${sendFromEmail}>`);
+    console.log('   To:', to);
+    console.log('   Subject:', subject || `${siteName} Onay Maili`);
+    
+    const mailOptions = {
+      from: `${sendFromName} <${sendFromEmail}>`,
       to: to,
-      from: {
-        email: sendFromEmail,
-        name: siteName
-      },
       subject: subject || `${siteName} Onay Maili`,
       html: emailHtml,
       text: emailText,
       ...(siteEmail && { replyTo: siteEmail }),
     };
     
-    console.log('📧 SendGrid mesajı hazırlandı:', {
-      to: msg.to,
-      from: msg.from,
-      subject: msg.subject
-    });
+    console.log('📤 Nodemailer sendMail çağrılıyor...');
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email Gmail SMTP ile başarıyla gönderildi!');
+    console.log('📧 Message ID:', info.messageId);
     
-    await sgMail.send(msg);
-    
-    console.log('✅ Email SendGrid ile başarıyla gönderildi!');
-    console.log('📬 Alıcı:', to);
-    
-    // Firestore'a da kaydet (log için)
+    // Firestore'a log olarak kaydet
     try {
-      await db.collection('mail').add({
+      await db.collection('mail_logs').add({
         to: to,
-        message: {
-          subject: subject || `${siteName} Onay Maili`,
-          html: emailHtml,
-          text: emailText,
-        },
-        sentVia: 'sendgrid',
+        subject: subject || `${siteName} Onay Maili`,
+        messageId: info.messageId,
         sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'sent',
+        via: 'gmail-smtp',
       });
     } catch (firestoreError) {
-      console.warn('⚠️ Firestore\'a kayıt yapılamadı (önemli değil):', firestoreError);
+      console.warn('⚠️ Firestore log kaydı yapılamadı (önemli değil):', firestoreError);
     }
     
     return { 
       success: true,
+      messageId: info.messageId,
       message: 'Email başarıyla gönderildi',
-      sentVia: 'sendgrid'
+      sentVia: 'gmail-smtp'
     };
   } catch (error) {
-    console.error('❌ Email kuyruğa ekleme hatası:', error);
+    console.error('❌ Email gönderme hatası:', error);
     console.error('📚 Error details:', {
       code: error.code,
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
+      response: error.response, // Nodemailer hataları için
+      responseCode: error.responseCode,
+      command: error.command
     });
     
+    // Gmail kimlik doğrulama hatası için özel mesaj
+    if (error.code === 'EAUTH' || error.message?.includes('Invalid login') || error.message?.includes('Username and Password not accepted')) {
+      console.error('🔐 Gmail kimlik doğrulama hatası tespit edildi!');
+      console.error('💡 Kontrol edilmesi gerekenler:');
+      console.error('   1. Gmail App Password doğru mu?');
+      console.error('   2. Gmail hesabında 2 Adımlı Doğrulama aktif mi?');
+      console.error('   3. App Password silinmiş veya değiştirilmiş olabilir mi?');
+      console.error('   4. Config doğru yüklendi mi? (functions:config:get ile kontrol edin)');
+      
+      // Config'i tekrar kontrol et
+      try {
+        const config = functions.config();
+        console.error('📦 Mevcut config:');
+        console.error('   gmail.user:', config?.gmail?.user ? config.gmail.user.substring(0, 5) + '***' : 'YOK');
+        console.error('   gmail.password:', config?.gmail?.password ? config.gmail.password.length + ' karakter' : 'YOK');
+      } catch (configError) {
+        console.error('⚠️ Config kontrol edilemedi:', configError);
+      }
+    }
+    
     // Daha detaylı hata mesajı
-    let errorMessage = 'Email kuyruğa eklenemedi';
-    if (error.code === 'permission-denied') {
+    let errorMessage = 'Email gönderilemedi';
+    if (error.code === 'EAUTH' || error.message?.includes('Invalid login') || error.message?.includes('Username and Password not accepted')) {
+      errorMessage = 'Gmail kimlik doğrulama hatası. Gmail App Password\'u kontrol edin. Yeni bir App Password oluşturmayı deneyin.';
+    } else if (error.code === 'permission-denied') {
       errorMessage = 'Firestore yazma izni yok. Firestore Security Rules\'ı kontrol edin.';
     } else if (error.message) {
       errorMessage = error.message;
@@ -264,8 +434,275 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
       {
         code: error.code,
         message: error.message,
-        originalError: error.toString()
+        originalError: error.toString(),
+        response: error.response
       }
     );
+  }
+});
+
+// HTTP endpoint - Admin onay işlemi (email'deki link buraya yönlendirilecek)
+exports.verifyAdmin = functions.https.onRequest(async (req, res) => {
+  const token = req.query.token || req.body.token;
+  
+  console.log('🔍 verifyAdmin HTTP endpoint çağrıldı');
+  console.log('🔑 Token:', token);
+  
+  if (!token) {
+    console.error('❌ Token bulunamadı');
+    res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Onay Hatası</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #0A1929;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+          }
+          .container {
+            text-align: center;
+            padding: 40px;
+            background-color: #1A2332;
+            border-radius: 10px;
+            max-width: 500px;
+          }
+          h1 { color: #F44336; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Onay Hatası</h1>
+          <p>Geçersiz onay linki. Token bulunamadı.</p>
+          <p>Lütfen email'deki linki tekrar kontrol edin.</p>
+        </div>
+      </body>
+      </html>
+    `);
+    return;
+  }
+  
+  const db = admin.firestore();
+  
+  try {
+    console.log('🔍 Token doğrulanıyor: $token');
+    
+    // Pending admin'i bul
+    const query = await db.collection('pending_admins')
+      .where('token', '==', token)
+      .where('verified', '==', false)
+      .limit(1)
+      .get();
+    
+    if (query.empty) {
+      console.error('❌ Geçersiz veya kullanılmış token');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Onay Hatası</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              background-color: #0A1929;
+              color: white;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+            }
+            .container {
+              text-align: center;
+              padding: 40px;
+              background-color: #1A2332;
+              border-radius: 10px;
+              max-width: 500px;
+            }
+            h1 { color: #F44336; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>❌ Onay Hatası</h1>
+            <p>Geçersiz veya kullanılmış onay linki.</p>
+            <p>Lütfen yeni bir kayıt yapın veya admin panelinden manuel onay isteyin.</p>
+          </div>
+        </body>
+        </html>
+      `);
+      return;
+    }
+    
+    const doc = query.docs[0];
+    const data = doc.data();
+    const email = data.email;
+    const password = data.password;
+    const firstName = data.firstName || '';
+    const lastName = data.lastName || '';
+    
+    console.log('✅ Admin bulundu:', email);
+    
+    // Admin'i onayla
+    const existingAdminQuery = await db.collection('admins')
+      .where('email', '==', email)
+      .limit(1)
+      .get();
+    
+    const batch = db.batch();
+    
+    // Pending admin'i verified olarak işaretle
+    batch.update(doc.ref, { verified: true });
+    
+    // Admin zaten yoksa ekle
+    if (existingAdminQuery.empty) {
+      const adminRef = db.collection('admins').doc();
+      batch.set(adminRef, {
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Admin varsa firstName ve lastName'i güncelle
+      const existingDoc = existingAdminQuery.docs[0];
+      const updateData = {};
+      if (firstName) updateData.firstName = firstName;
+      if (lastName) updateData.lastName = lastName;
+      if (Object.keys(updateData).length > 0) {
+        batch.update(existingDoc.ref, updateData);
+      }
+    }
+    
+    await batch.commit();
+    console.log('✅ Admin onaylandı ve admins koleksiyonuna eklendi');
+    
+    // Firebase Auth'da kullanıcı oluştur veya giriş yap
+    try {
+      // Önce kullanıcıyı oluşturmayı dene
+      await admin.auth().createUser({
+        email: email,
+        password: password,
+        emailVerified: true,
+      });
+      console.log('✅ Firebase Auth kullanıcısı oluşturuldu');
+    } catch (authError) {
+      if (authError.code === 'auth/email-already-exists') {
+        console.log('ℹ️ Kullanıcı zaten mevcut, güncelleniyor...');
+        // Kullanıcı zaten varsa, şifresini güncelle
+        const user = await admin.auth().getUserByEmail(email);
+        await admin.auth().updateUser(user.uid, {
+          password: password,
+          emailVerified: true,
+        });
+        console.log('✅ Firebase Auth kullanıcısı güncellendi');
+      } else {
+        console.warn('⚠️ Firebase Auth hatası (önemli değil):', authError);
+      }
+    }
+    
+    // Başarılı HTML sayfası gönder
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Hesap Onaylandı</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #0A1929;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+          }
+          .container {
+            text-align: center;
+            padding: 40px;
+            background-color: #1A2332;
+            border-radius: 10px;
+            max-width: 500px;
+          }
+          h1 { color: #4CAF50; }
+          .success-icon {
+            font-size: 80px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+          }
+          .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+          }
+          .button:hover {
+            background-color: #1976D2;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="success-icon">✓</div>
+          <h1>Hesap Onaylandı!</h1>
+          <p>Hesabınız başarıyla onaylandı.</p>
+          <p>Artık giriş yapabilirsiniz.</p>
+          <a href="https://${process.env.GCLOUD_PROJECT || 'bmt-web-41790'}.firebaseapp.com/#/admin-login" class="button">Giriş Yap</a>
+        </div>
+      </body>
+      </html>
+    `);
+    
+  } catch (error) {
+    console.error('❌ Onay hatası:', error);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Onay Hatası</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            background-color: #0A1929;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+          }
+          .container {
+            text-align: center;
+            padding: 40px;
+            background-color: #1A2332;
+            border-radius: 10px;
+            max-width: 500px;
+          }
+          h1 { color: #F44336; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>❌ Onay Hatası</h1>
+          <p>Onay işlemi sırasında bir hata oluştu.</p>
+          <p>Lütfen daha sonra tekrar deneyin veya admin panelinden manuel onay isteyin.</p>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });

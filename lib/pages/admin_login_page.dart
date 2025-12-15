@@ -24,7 +24,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   }
 
   Future<void> _signIn() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
       return;
     }
 

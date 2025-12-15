@@ -48,12 +48,21 @@ class AuthProvider with ChangeNotifier {
       _setLoading(true);
       _error = null;
       
-      await _authService.signInWithEmailAndPassword(email, password);
+      final credential = await _authService.signInWithEmailAndPassword(email, password);
       
       // User will be updated via authStateChanges stream
-      await _checkAdminStatus();
+      // credential null olabilir, bu durumda authStateChanges stream'den gelecek
+      if (credential != null && credential.user != null) {
+        _user = credential.user;
+        await _checkAdminStatus();
+      } else {
+        // authStateChanges stream'den user gelecek, biraz bekle
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _checkAdminStatus();
+      }
       
       _setLoading(false);
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _setLoading(false);
@@ -99,10 +108,12 @@ class AuthProvider with ChangeNotifier {
       _error = null;
       
       final credential = await _authService.createUserWithEmailAndPassword(email, password);
-      _user = credential.user;
+      _user = credential.user; // user null olabilir, authStateChanges stream'den gelecek
       
       // User will be updated via authStateChanges stream
-      await _checkAdminStatus();
+      if (_user != null) {
+        await _checkAdminStatus();
+      }
       
       _setLoading(false);
       notifyListeners();
