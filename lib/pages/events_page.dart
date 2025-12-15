@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
 import '../services/firestore_service.dart';
+import '../utils/size_helper.dart';
 
 class EventsPage extends StatelessWidget {
   const EventsPage({super.key});
@@ -9,6 +10,7 @@ class EventsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0E17),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -28,24 +30,70 @@ class _EventsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF0A0E17),
+            const Color(0xFF1A2332).withOpacity(0.3),
+            const Color(0xFF0A0E17),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+      padding: SizeHelper.safePadding(
+        context: context,
+        horizontal: 60,
+        vertical: 60,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A2332),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF2196F3).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.event,
+                  color: Color(0xFF2196F3),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Etkinlikler',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          Text(
             'Etkinlik Takvimi',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 48,
+              fontSize: SizeHelper.safeFontSize(context, preferredSize: 48),
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Yaklaşan etkinliklerimize göz atın ve teknoloji dünyasında bir adım öne geçin',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: 18,
+              fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
             ),
           ),
           const SizedBox(height: 40),
@@ -90,11 +138,11 @@ class _EventsContent extends StatelessWidget {
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.75,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 4),
+                  crossAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
+                  mainAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
+                  childAspectRatio: SizeHelper.safeSize(value: 0.75, min: 0.5, max: 1.0, context: 'Grid aspect ratio'),
                 ),
                 itemCount: events.length,
                 itemBuilder: (context, index) {
@@ -118,68 +166,61 @@ class _EventCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
+        color: const Color(0xFF0A0E17),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
+          color: event.color.withOpacity(0.3),
+          width: 2,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top colored section
-          Container(
-            height: 80,
-            decoration: BoxDecoration(
-              color: event.color,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
+          // Type badge at top
+          Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: event.color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    color: event.color,
+                    size: 16,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
+                  const SizedBox(width: 6),
+                  Text(
                     event.type,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+                    style: TextStyle(
+                      color: event.color,
+                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 12),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-                const Icon(
-                  Icons.calendar_today,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           // Content
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     event.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
                       fontWeight: FontWeight.bold,
                       height: 1.3,
                     ),
@@ -208,7 +249,7 @@ class _EventCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
-                    width: double.infinity,
+                    width: SizeHelper.safeInfinity(context, isWidth: true),
                     child: ElevatedButton(
                       onPressed: () {},
                       style: ElevatedButton.styleFrom(
@@ -219,15 +260,16 @@ class _EventCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Kayıt Ol',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: SizeHelper.safeFontSize(context, preferredSize: 14),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -253,9 +295,9 @@ class _EventInfo extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white70,
-              fontSize: 13,
+              fontSize: SizeHelper.safeFontSize(context, preferredSize: 13),
             ),
           ),
         ),

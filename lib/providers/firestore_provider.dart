@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 
-// Re-export EventData for convenience
-export '../services/firestore_service.dart' show EventData;
+// Re-export EventData, AnnouncementData, TeamData, TeamMemberData, and SponsorData for convenience
+export '../services/firestore_service.dart' show EventData, AnnouncementData, TeamData, TeamMemberData, SponsorData;
 
 class FirestoreProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
@@ -26,6 +27,22 @@ class FirestoreProvider with ChangeNotifier {
       await _firestoreService.addEvent(event);
       _setLoading(false);
       notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addEventAndGetRef(EventData event) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addEventAndGetRef(event);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
     } catch (e) {
       _error = e.toString();
       _setLoading(false);
@@ -202,6 +219,278 @@ class FirestoreProvider with ChangeNotifier {
       _setLoading(true);
       _error = null;
       await _firestoreService.updateSiteSettings(settings);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Announcements
+  Stream<List<AnnouncementData>> getAnnouncements() {
+    return _firestoreService.getAnnouncements();
+  }
+
+  Stream<List<AnnouncementData>> getAnnouncementsByType(String type) {
+    return _firestoreService.getAnnouncementsByType(type);
+  }
+
+  Future<void> addAnnouncement(AnnouncementData announcement) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addAnnouncement(announcement);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addAnnouncementAndGetRef(AnnouncementData announcement) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final ref = await _firestoreService.addAnnouncementAndGetRef(announcement);
+      _setLoading(false);
+      notifyListeners();
+      return ref;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateAnnouncement(String announcementId, AnnouncementData announcement) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateAnnouncement(announcementId, announcement);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAnnouncement(String announcementId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteAnnouncement(announcementId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Teams
+  Stream<List<TeamData>> getTeams() {
+    return _firestoreService.getTeams();
+  }
+
+  Future<void> addTeam(TeamData team) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addTeam(team);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addTeamAndGetRef(TeamData team) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addTeamAndGetRef(team);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateTeam(String teamId, TeamData team) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateTeam(teamId, team);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTeam(String teamId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteTeam(teamId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Team Members
+  Stream<List<TeamMemberData>> getTeamMembers(String teamId) {
+    return _firestoreService.getTeamMembers(teamId);
+  }
+
+  Stream<List<TeamMemberData>> getAllTeamMembers() {
+    return _firestoreService.getAllTeamMembers();
+  }
+
+  Future<void> addTeamMember(TeamMemberData member) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addTeamMember(member);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addTeamMemberAndGetRef(TeamMemberData member) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addTeamMemberAndGetRef(member);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateTeamMember(String memberId, TeamMemberData member) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateTeamMember(memberId, member);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTeamMember(String memberId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteTeamMember(memberId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Sponsors
+  Stream<List<SponsorData>> getSponsors() {
+    return _firestoreService.getSponsors();
+  }
+
+  Future<void> addSponsor(SponsorData sponsor) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addSponsor(sponsor);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addSponsorAndGetRef(SponsorData sponsor) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addSponsorAndGetRef(sponsor);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateSponsor(String sponsorId, SponsorData sponsor) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateSponsor(sponsorId, sponsor);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSponsor(String sponsorId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteSponsor(sponsorId);
       _setLoading(false);
       notifyListeners();
     } catch (e) {

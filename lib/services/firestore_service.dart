@@ -15,6 +15,44 @@ class FirestoreService {
       );
     }
   }
+  
+  // Firestore bağlantısını test et
+  Future<bool> testConnection() async {
+    try {
+      await _firestore.collection('_test').limit(1).get().timeout(
+        const Duration(seconds: 5),
+      );
+      return true;
+    } catch (e) {
+      print('❌ Firestore bağlantı testi başarısız: $e');
+      return false;
+    }
+  }
+  
+  // Belirli bir koleksiyon için okuma iznini test et
+  Future<String?> testReadPermission(String collectionName) async {
+    try {
+      await _firestore.collection(collectionName).limit(1).get().timeout(
+        const Duration(seconds: 5),
+      );
+      return null; // Başarılı
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        return 'Firestore Security Rules hatası: $collectionName koleksiyonu için okuma izni verilmelidir.\n\n'
+            'Firebase Console\'da Firestore Database > Rules sekmesine gidin ve şu kuralı ekleyin:\n\n'
+            'match /$collectionName/{document=**} {\n'
+            '  allow read, write: if true;\n'
+            '}\n\n'
+            'Sonra Publish butonuna tıklayın!';
+      } else if (e.code == 'unavailable') {
+        return 'Firestore şu anda kullanılamıyor. İnternet bağlantınızı kontrol edin.';
+      } else {
+        return 'Firestore hatası (${e.code}): ${e.message}';
+      }
+    } catch (e) {
+      return 'Beklenmeyen hata: $e';
+    }
+  }
   final String _eventsCollection = 'events';
   final String _pendingAdminsCollection = 'pending_admins';
   final String _adminsCollection = 'admins';
@@ -22,6 +60,10 @@ class FirestoreService {
   final String _contactSettingsDocId = 'main';
   final String _siteSettingsCollection = 'site_settings';
   final String _siteSettingsDocId = 'main';
+  final String _announcementsCollection = 'announcements';
+  final String _teamsCollection = 'teams';
+  final String _teamMembersCollection = 'team_members';
+  final String _sponsorsCollection = 'sponsors';
 
 
   // Get all events
@@ -40,6 +82,12 @@ class FirestoreService {
   // Add event
   Future<void> addEvent(EventData event) async {
     await _firestore.collection(_eventsCollection).add(event.toMap());
+  }
+
+  // Add event and return document reference
+  Future<DocumentReference> addEventAndGetRef(EventData event) async {
+    final docRef = await _firestore.collection(_eventsCollection).add(event.toMap());
+    return docRef;
   }
 
   // Update event
@@ -448,6 +496,399 @@ class FirestoreService {
         .set(settings, SetOptions(merge: true));
   }
 
+  // Announcements
+  Stream<List<AnnouncementData>> getAnnouncements() {
+    return _firestore
+        .collection(_announcementsCollection)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getAnnouncements hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Duyurular koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Duyurular yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => AnnouncementData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Stream<List<AnnouncementData>> getAnnouncementsByType(String type) {
+    return _firestore
+        .collection(_announcementsCollection)
+        .where('type', isEqualTo: type)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getAnnouncementsByType hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Duyurular koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Duyurular yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => AnnouncementData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addAnnouncement(AnnouncementData announcement) async {
+    await _firestore.collection(_announcementsCollection).add(announcement.toMap());
+  }
+
+  Future<DocumentReference> addAnnouncementAndGetRef(AnnouncementData announcement) async {
+    return await _firestore.collection(_announcementsCollection).add(announcement.toMap());
+  }
+
+  Future<void> updateAnnouncement(String announcementId, AnnouncementData announcement) async {
+    await _firestore
+        .collection(_announcementsCollection)
+        .doc(announcementId)
+        .update(announcement.toMap());
+  }
+
+  Future<void> deleteAnnouncement(String announcementId) async {
+    await _firestore.collection(_announcementsCollection).doc(announcementId).delete();
+  }
+
+  // Teams
+  Stream<List<TeamData>> getTeams() {
+    return _firestore
+        .collection(_teamsCollection)
+        .orderBy('name', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getTeams hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Ekipler koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Ekipler yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => TeamData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addTeam(TeamData team) async {
+    try {
+      await _firestore.collection(_teamsCollection).add(team.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addTeam FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'teams koleksiyonu için yazma izni verilmelidir.\n'
+            'Örnek rule:\n'
+            'match /teams/{document=**} {\n'
+            '  allow write: if request.auth != null;\n'
+            '}';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addTeam hatası: $e');
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw 'Firestore izin hatası. Lütfen Firebase konsolunda gerekli izinlerin ayarlandığından emin olun.';
+      }
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addTeamAndGetRef(TeamData team) async {
+    try {
+      return await _firestore.collection(_teamsCollection).add(team.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addTeamAndGetRef FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'teams koleksiyonu için yazma izni verilmelidir.\n'
+            'Örnek rule:\n'
+            'match /teams/{document=**} {\n'
+            '  allow write: if request.auth != null;\n'
+            '}';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addTeamAndGetRef hatası: $e');
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw 'Firestore izin hatası. Lütfen Firebase konsolunda gerekli izinlerin ayarlandığından emin olun.';
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateTeam(String teamId, TeamData team) async {
+    try {
+      await _firestore
+          .collection(_teamsCollection)
+          .doc(teamId)
+          .update(team.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ updateTeam FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'teams koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip güncellenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ updateTeam hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTeam(String teamId) async {
+    try {
+      // Delete all team members first
+      final membersQuery = await _firestore
+          .collection(_teamMembersCollection)
+          .where('teamId', isEqualTo: teamId)
+          .get();
+      
+      final batch = _firestore.batch();
+      for (var doc in membersQuery.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      
+      // Delete team
+      await _firestore.collection(_teamsCollection).doc(teamId).delete();
+    } on FirebaseException catch (e) {
+      print('❌ deleteTeam FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'teams ve team_members koleksiyonları için silme izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip silinirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ deleteTeam hatası: $e');
+      rethrow;
+    }
+  }
+
+  // Team Members
+  Stream<List<TeamMemberData>> getTeamMembers(String teamId) {
+    return _firestore
+        .collection(_teamMembersCollection)
+        .where('teamId', isEqualTo: teamId)
+        .orderBy('name', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getTeamMembers hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Ekip üyeleri koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Ekip üyeleri yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => TeamMemberData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Stream<List<TeamMemberData>> getAllTeamMembers() {
+    return _firestore
+        .collection(_teamMembersCollection)
+        .orderBy('name', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getAllTeamMembers hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Ekip üyeleri koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Ekip üyeleri yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => TeamMemberData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addTeamMember(TeamMemberData member) async {
+    try {
+      await _firestore.collection(_teamMembersCollection).add(member.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addTeamMember FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'team_members koleksiyonu için yazma izni verilmelidir.\n'
+            'Örnek rule:\n'
+            'match /team_members/{document=**} {\n'
+            '  allow write: if request.auth != null;\n'
+            '}';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip üyesi eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addTeamMember hatası: $e');
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw 'Firestore izin hatası. Lütfen Firebase konsolunda gerekli izinlerin ayarlandığından emin olun.';
+      }
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addTeamMemberAndGetRef(TeamMemberData member) async {
+    try {
+      return await _firestore.collection(_teamMembersCollection).add(member.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addTeamMemberAndGetRef FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'team_members koleksiyonu için yazma izni verilmelidir.\n'
+            'Örnek rule:\n'
+            'match /team_members/{document=**} {\n'
+            '  allow write: if request.auth != null;\n'
+            '}';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip üyesi eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addTeamMemberAndGetRef hatası: $e');
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw 'Firestore izin hatası. Lütfen Firebase konsolunda gerekli izinlerin ayarlandığından emin olun.';
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateTeamMember(String memberId, TeamMemberData member) async {
+    try {
+      await _firestore
+          .collection(_teamMembersCollection)
+          .doc(memberId)
+          .update(member.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ updateTeamMember FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'team_members koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip üyesi güncellenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ updateTeamMember hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTeamMember(String memberId) async {
+    try {
+      await _firestore.collection(_teamMembersCollection).doc(memberId).delete();
+    } on FirebaseException catch (e) {
+      print('❌ deleteTeamMember FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'team_members koleksiyonu için silme izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Ekip üyesi silinirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ deleteTeamMember hatası: $e');
+      rethrow;
+    }
+  }
+
+  // Sponsors
+  Stream<List<SponsorData>> getSponsors() {
+    return _firestore
+        .collection(_sponsorsCollection)
+        .orderBy('name', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getSponsors hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Sponsorlar koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Sponsorlar yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => SponsorData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addSponsor(SponsorData sponsor) async {
+    await _firestore.collection(_sponsorsCollection).add(sponsor.toMap());
+  }
+
+  Future<DocumentReference> addSponsorAndGetRef(SponsorData sponsor) async {
+    return await _firestore.collection(_sponsorsCollection).add(sponsor.toMap());
+  }
+
+  Future<void> updateSponsor(String sponsorId, SponsorData sponsor) async {
+    await _firestore
+        .collection(_sponsorsCollection)
+        .doc(sponsorId)
+        .update(sponsor.toMap());
+  }
+
+  Future<void> deleteSponsor(String sponsorId) async {
+    await _firestore.collection(_sponsorsCollection).doc(sponsorId).delete();
+  }
+
 }
 
 class EventData {
@@ -458,9 +899,8 @@ class EventData {
   final String time;
   final String location;
   final int participants;
-
   final String colorHex;
-
+  final List<String> images;
 
   EventData({
     this.id,
@@ -471,8 +911,8 @@ class EventData {
     required this.location,
     required this.participants,
     required this.colorHex,
+    this.images = const [],
   });
-
 
   Map<String, dynamic> toMap() {
     return {
@@ -483,9 +923,9 @@ class EventData {
       'location': location,
       'participants': participants,
       'colorHex': colorHex,
+      'images': images,
     };
   }
-
 
   factory EventData.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -498,9 +938,9 @@ class EventData {
       location: data['location'] ?? '',
       participants: data['participants'] ?? 0,
       colorHex: data['colorHex'] ?? '#2196F3',
+      images: List<String>.from(data['images'] ?? []),
     );
   }
-
 
   Color get color {
     return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
@@ -515,6 +955,7 @@ class EventData {
     String? location,
     int? participants,
     String? colorHex,
+    List<String>? images,
   }) {
     return EventData(
       id: id ?? this.id,
@@ -525,6 +966,264 @@ class EventData {
       location: location ?? this.location,
       participants: participants ?? this.participants,
       colorHex: colorHex ?? this.colorHex,
+      images: images ?? this.images,
+    );
+  }
+}
+
+class AnnouncementData {
+  final String? id;
+  final String type; // 'bölüm', 'etkinlik', 'topluluk'
+  final String eventName; // Etkinlik adı
+  final String posterUrl; // Afiş URL'i
+  final String date; // Tarih
+  final String address; // Adres
+  final String? description; // Açıklama (opsiyonel)
+  final String colorHex; // Renk hex kodu
+
+  AnnouncementData({
+    this.id,
+    required this.type,
+    required this.eventName,
+    required this.posterUrl,
+    required this.date,
+    required this.address,
+    this.description,
+    this.colorHex = '#2196F3',
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'type': type,
+      'eventName': eventName,
+      'posterUrl': posterUrl,
+      'date': date,
+      'address': address,
+      'description': description ?? '',
+      'colorHex': colorHex,
+    };
+  }
+
+  factory AnnouncementData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return AnnouncementData(
+      id: doc.id,
+      type: data['type'] ?? '',
+      eventName: data['eventName'] ?? '',
+      posterUrl: data['posterUrl'] ?? '',
+      date: data['date'] ?? '',
+      address: data['address'] ?? '',
+      description: data['description'],
+      colorHex: data['colorHex'] ?? '#2196F3',
+    );
+  }
+
+  Color get color {
+    return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+  }
+
+  AnnouncementData copyWith({
+    String? id,
+    String? type,
+    String? eventName,
+    String? posterUrl,
+    String? date,
+    String? address,
+    String? description,
+    String? colorHex,
+  }) {
+    return AnnouncementData(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      eventName: eventName ?? this.eventName,
+      posterUrl: posterUrl ?? this.posterUrl,
+      date: date ?? this.date,
+      address: address ?? this.address,
+      description: description ?? this.description,
+      colorHex: colorHex ?? this.colorHex,
+    );
+  }
+}
+
+class TeamData {
+  final String? id;
+  final String name;
+  final String? description;
+
+  TeamData({
+    this.id,
+    required this.name,
+    this.description,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description ?? '',
+    };
+  }
+
+  factory TeamData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return TeamData(
+      id: doc.id,
+      name: data['name'] ?? '',
+      description: data['description'],
+    );
+  }
+
+  TeamData copyWith({
+    String? id,
+    String? name,
+    String? description,
+  }) {
+    return TeamData(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+    );
+  }
+}
+
+class TeamMemberData {
+  final String? id;
+  final String teamId;
+  final String name;
+  final String department; // Bölüm
+  final String? className; // Sınıf
+  final String title; // Ünvan
+  final String? photoUrl; // Fotoğraf URL'i
+
+  TeamMemberData({
+    this.id,
+    required this.teamId,
+    required this.name,
+    required this.department,
+    this.className,
+    required this.title,
+    this.photoUrl,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'teamId': teamId,
+      'name': name,
+      'department': department,
+      'className': className ?? '',
+      'title': title,
+      'photoUrl': photoUrl ?? '',
+    };
+  }
+
+  factory TeamMemberData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return TeamMemberData(
+      id: doc.id,
+      teamId: data['teamId'] ?? '',
+      name: data['name'] ?? '',
+      department: data['department'] ?? '',
+      className: data['className'],
+      title: data['title'] ?? '',
+      photoUrl: data['photoUrl'],
+    );
+  }
+
+  TeamMemberData copyWith({
+    String? id,
+    String? teamId,
+    String? name,
+    String? department,
+    String? className,
+    String? title,
+    String? photoUrl,
+  }) {
+    return TeamMemberData(
+      id: id ?? this.id,
+      teamId: teamId ?? this.teamId,
+      name: name ?? this.name,
+      department: department ?? this.department,
+      className: className ?? this.className,
+      title: title ?? this.title,
+      photoUrl: photoUrl ?? this.photoUrl,
+    );
+  }
+}
+
+class SponsorData {
+  final String? id;
+  final String name;
+  final String? description;
+  final String logoUrl;
+  final String? websiteUrl;
+  final String tier; // 'platinum', 'gold', 'silver', 'bronze'
+  final int? order; // Sıralama için
+
+  SponsorData({
+    this.id,
+    required this.name,
+    this.description,
+    required this.logoUrl,
+    this.websiteUrl,
+    this.tier = 'bronze',
+    this.order,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'description': description ?? '',
+      'logoUrl': logoUrl,
+      'websiteUrl': websiteUrl ?? '',
+      'tier': tier,
+      'order': order ?? 0,
+    };
+  }
+
+  factory SponsorData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return SponsorData(
+      id: doc.id,
+      name: data['name'] ?? '',
+      description: data['description'],
+      logoUrl: data['logoUrl'] ?? '',
+      websiteUrl: data['websiteUrl'],
+      tier: data['tier'] ?? 'bronze',
+      order: data['order'],
+    );
+  }
+
+  Color get tierColor {
+    switch (tier.toLowerCase()) {
+      case 'platinum':
+        return const Color(0xFFE5E4E2);
+      case 'gold':
+        return const Color(0xFFFFD700);
+      case 'silver':
+        return const Color(0xFFC0C0C0);
+      case 'bronze':
+        return const Color(0xFFCD7F32);
+      default:
+        return const Color(0xFF2196F3);
+    }
+  }
+
+  SponsorData copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? logoUrl,
+    String? websiteUrl,
+    String? tier,
+    int? order,
+  }) {
+    return SponsorData(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      logoUrl: logoUrl ?? this.logoUrl,
+      websiteUrl: websiteUrl ?? this.websiteUrl,
+      tier: tier ?? this.tier,
+      order: order ?? this.order,
     );
   }
 }

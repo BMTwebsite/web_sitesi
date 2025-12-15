@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
 import '../services/firestore_service.dart';
+import '../utils/size_helper.dart';
 
 // Conditional import for web and non-web platforms
 import 'map_helper_stub.dart'
@@ -16,7 +17,7 @@ class ContactPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
+      backgroundColor: const Color(0xFF0A0E17),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -34,50 +35,34 @@ class _ContactContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
 
   List<SocialMedia> _parseSocialMedia(List<dynamic>? socialMediaData) {
-    // Eğer admin sosyal medya eklemişse onları kullan
-    if (socialMediaData != null && socialMediaData.isNotEmpty) {
-      return socialMediaData.map((item) {
-        final data = item as Map<String, dynamic>;
-        return SocialMedia(
-          name: data['name'] ?? '',
-          icon: _getIconData(data['icon'] ?? 'link'),
-          url: data['url'] ?? '',
-          color: _parseColor(data['color'] ?? '#2196F3'),
-        );
-      }).toList();
+    if (socialMediaData == null || socialMediaData.isEmpty) {
+      // Admin henüz sosyal medya eklemediyse hiçbir şey gösterme
+      return [];
     }
-    
-    // Placeholder sosyal medya kartları (linkler boş)
-    return [
-      SocialMedia(
-        name: 'Instagram',
-        icon: Icons.camera_alt,
-        url: '', // Boş - admin dolduracak
-        color: const Color(0xFFE4405F),
-      ),
-      SocialMedia(
-        name: 'LinkedIn',
-        icon: Icons.business,
-        url: '', // Boş - admin dolduracak
-        color: const Color(0xFF0077B5),
-      ),
-      SocialMedia(
-        name: 'YouTube',
-        icon: Icons.play_circle_filled,
-        url: '', // Boş - admin dolduracak
-        color: const Color(0xFFFF0000),
-      ),
-      SocialMedia(
-        name: 'TikTok',
-        icon: Icons.music_note,
-        url: '', // Boş - admin dolduracak
-        color: const Color(0xFF000000),
-      ),
-    ];
+
+    return socialMediaData.map((item) {
+      final data = item as Map<String, dynamic>;
+      return SocialMedia(
+        name: data['name'] ?? '',
+        icon: _getIconData(data['icon'] ?? 'link'),
+        url: data['url'] ?? '',
+        color: _parseColor(data['color'] ?? '#2196F3'),
+      );
+    }).toList();
   }
 
   IconData _getIconData(String iconName) {
     switch (iconName) {
+      case 'instagram':
+        return Icons.camera_alt;
+      case 'linkedin':
+        return Icons.business;
+      case 'youtube':
+        return Icons.play_circle_filled;
+      case 'tiktok':
+        return Icons.music_note;
+      case 'whatsapp':
+        return Icons.chat;
       case 'camera_alt':
         return Icons.camera_alt;
       case 'business':
@@ -111,7 +96,20 @@ class _ContactContent extends StatelessWidget {
     final isMobile = screenWidth < 768;
 
     return Container(
-      padding: EdgeInsets.symmetric(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF0A0E17),
+            const Color(0xFF1A2332).withOpacity(0.3),
+            const Color(0xFF0A0E17),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+      padding: SizeHelper.safePadding(
+        context: context,
         horizontal: isMobile ? 20 : 60,
         vertical: isMobile ? 40 : 60,
       ),
@@ -130,13 +128,17 @@ class _ContactContent extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A2332),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.contact_mail,
-                        color: const Color(0xFF2196F3),
+                        color: Color(0xFF2196F3),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -152,7 +154,10 @@ class _ContactContent extends StatelessWidget {
                   'İletişim',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: isMobile ? 40 : 56,
+                    fontSize: SizeHelper.safeFontSize(
+                      context,
+                      preferredSize: isMobile ? 40 : 56,
+                    ),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -255,12 +260,12 @@ class _ContactContent extends StatelessWidget {
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 1.1,
+                              gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 2),
+                                crossAxisSpacing: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Grid spacing'),
+                                mainAxisSpacing: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Grid spacing'),
+                                childAspectRatio: SizeHelper.safeSize(value: 1.1, min: 0.8, max: 1.5, context: 'Grid aspect ratio'),
                               ),
                           itemCount: socialMediaList.length,
                           itemBuilder: (context, index) {
@@ -348,24 +353,24 @@ class _ContactContent extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              const Text(
+                              Text(
                                 'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
                                 style: TextStyle(
                                   color: Colors.white70,
-                                  fontSize: 16,
+                                  fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
                                 ),
                               ),
                               const SizedBox(height: 30),
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      crossAxisSpacing: 20,
-                                      mainAxisSpacing: 20,
-                                      childAspectRatio: 1.2,
-                                    ),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 2),
+                                crossAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
+                                mainAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
+                                childAspectRatio: SizeHelper.safeSize(value: 1.2, min: 0.8, max: 1.5, context: 'Grid aspect ratio'),
+                              ),
                                 itemCount: socialMediaList.length,
                                 itemBuilder: (context, index) {
                                   return _SocialMediaCard(
@@ -481,8 +486,8 @@ class _ContactContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       Container(
-                        width: double.infinity,
-                        height: 200,
+                        width: SizeHelper.safeInfinity(context, isWidth: true),
+                        height: SizeHelper.safeSize(value: 200, min: 150, max: 400, context: 'Map height'),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0A1929),
                           borderRadius: BorderRadius.circular(16),
@@ -542,22 +547,22 @@ class _ContactContent extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                const Text(
+                                Text(
                                   'Mesaj Gönderin',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 24,
+                                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 24),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 20),
-                            const Text(
+                            Text(
                               'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 16,
+                                fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
                                 height: 1.6,
                               ),
                             ),
@@ -604,8 +609,8 @@ class _ContactContent extends StatelessWidget {
                       ),
                       const SizedBox(width: 40),
                       Container(
-                        width: 300,
-                        height: 200,
+                        width: SizeHelper.safeSize(value: 300, min: 200, max: 500, context: 'Map width'),
+                        height: SizeHelper.safeSize(value: 200, min: 150, max: 400, context: 'Map height'),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0A1929),
                           borderRadius: BorderRadius.circular(16),
@@ -668,10 +673,6 @@ class _SocialMediaCard extends StatelessWidget {
 
   const _SocialMediaCard(this.socialMedia);
 
-  Widget _getSocialMediaIcon(String name) {
-    return Icon(socialMedia.icon, color: socialMedia.color, size: 48);
-  }
-
   @override
   Widget build(BuildContext context) {
     final hasUrl = socialMedia.url.isNotEmpty;
@@ -686,11 +687,11 @@ class _SocialMediaCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2332),
+          color: const Color(0xFF0A0E17),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
+            color: socialMedia.color.withValues(alpha: 0.3),
+            width: 2,
           ),
         ),
         child: Column(
@@ -702,14 +703,18 @@ class _SocialMediaCard extends StatelessWidget {
                 color: socialMedia.color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: _getSocialMediaIcon(socialMedia.name),
+              child: Icon(
+                socialMedia.icon,
+                color: socialMedia.color,
+                size: SizeHelper.safeSize(value: 48, min: 32, max: 64, context: 'Social media icon size'),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               socialMedia.name,
               style: TextStyle(
                 color: hasUrl ? Colors.white : Colors.white54, // URL boşsa daha soluk
-                fontSize: 16,
+                fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -720,7 +725,7 @@ class _SocialMediaCard extends StatelessWidget {
                   'Link eklenmedi',
                   style: TextStyle(
                     color: Colors.white38,
-                    fontSize: 10,
+                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 10),
                   ),
                 ),
               ),
@@ -758,11 +763,11 @@ class _ContactInfoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2332),
+          color: const Color(0xFF0A0E17),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
+            color: color.withValues(alpha: 0.3),
+            width: 2,
           ),
         ),
         child: Row(
@@ -783,9 +788,9 @@ class _ContactInfoCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
                       fontWeight: FontWeight.bold,
                     ),
                   ),

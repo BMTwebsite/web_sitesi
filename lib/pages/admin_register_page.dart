@@ -121,9 +121,6 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
           duration: const Duration(seconds: 5),
         ),
       );
-    } catch (e) {
-      // Error already handled above
-      rethrow;
     }
   }
 

@@ -1,20 +1,18 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     // Geçici olarak tüm koleksiyonlara tam erişim (test için)
     // Production'da daha güvenli kurallar kullanılmalı
     
-    // Pending Admins
     match /pending_admins/{document=**} {
       allow read, write: if true;
     }
     
-    // Events
     match /events/{document=**} {
       allow read, write: if true;
     }
     
-    // Admins
     match /admins/{document=**} {
       allow read, write: if true;
     }
@@ -24,32 +22,34 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
-    // Site settings - herkes okuyabilir, herkes yazabilir (test için)
+    // Site settings
     match /site_settings/{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // Contact settings - herkes okuyabilir, herkes yazabilir (test için)
+    // Contact settings
     match /contact_settings/{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // Announcements - herkes okuyabilir, herkes yazabilir (test için)
+    // Announcements - EKSİK OLAN KURAL!
     match /announcements/{document=**} {
       allow read, write: if true;
     }
     
-    // Teams - herkes okuyabilir, herkes yazabilir (test için)
+    // Teams - EKSİK OLAN KURAL!
     match /teams/{document=**} {
       allow read, write: if true;
     }
     
-    // Team Members - herkes okuyabilir, herkes yazabilir (test için)
+    // Team Members - EKSİK OLAN KURAL!
     match /team_members/{document=**} {
       allow read, write: if true;
     }
     
-    // Sponsors - herkes okuyabilir, herkes yazabilir (test için)
+    // Sponsors - EKSİK OLAN KURAL!
     match /sponsors/{document=**} {
       allow read, write: if true;
     }

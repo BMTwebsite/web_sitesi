@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/size_helper.dart';
 
 class Header extends StatelessWidget {
   final String currentRoute;
@@ -9,7 +10,21 @@ class Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0E17),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: SizeHelper.safePadding(
+        context: context,
+        horizontal: 40,
+        vertical: 20,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -23,24 +38,24 @@ class Header extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: SizeHelper.safeSize(value: 40, min: 20, max: 60, context: 'Logo width'),
+                  height: SizeHelper.safeSize(value: 40, min: 20, max: 60, context: 'Logo height'),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2196F3),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.memory,
                     color: Colors.white,
-                    size: 24,
+                    size: SizeHelper.safeSize(value: 24, min: 16, max: 32, context: 'Logo icon size'),
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
+                Text(
                   'BMT',
                   style: TextStyle(
-                    color: Color(0xFF0A1929),
-                    fontSize: 24,
+                    color: const Color(0xFF0A1929),
+                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 24),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -72,17 +87,24 @@ class Header extends StatelessWidget {
               ),
               const SizedBox(width: 30),
               _NavItem(
+                text: 'Duyurular',
+                route: '/announcements',
+                isActive: currentRoute == '/announcements',
+                onTap: () => Navigator.pushNamed(context, '/announcements'),
+              ),
+              const SizedBox(width: 30),
+              _NavItem(
                 text: 'Ekip',
                 route: '/team',
                 isActive: currentRoute == '/team',
-                onTap: () {},
+                onTap: () => Navigator.pushNamed(context, '/team'),
               ),
               const SizedBox(width: 30),
               _NavItem(
                 text: 'Sponsor',
                 route: '/sponsor',
                 isActive: currentRoute == '/sponsor',
-                onTap: () {},
+                onTap: () => Navigator.pushNamed(context, '/sponsor'),
               ),
               const SizedBox(width: 30),
               _NavItem(
@@ -99,14 +121,14 @@ class Header extends StatelessWidget {
                   if (!authSnapshot.hasData) {
                     return OutlinedButton.icon(
                       onPressed: () => Navigator.pushNamed(context, '/admin-login'),
-                      icon: const Icon(Icons.login, size: 18),
+                      icon: Icon(Icons.login, size: SizeHelper.safeSize(value: 18, min: 12, max: 24, context: 'Button icon size')),
                       label: const Text('Admin Girişi'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Button padding horizontal'),
+                          vertical: SizeHelper.safeSize(value: 8, min: 4, max: 16, context: 'Button padding vertical'),
                         ),
                       ),
                     );
@@ -120,28 +142,28 @@ class Header extends StatelessWidget {
                       if (isAdmin) {
                         return OutlinedButton.icon(
                           onPressed: () => Navigator.pushNamed(context, '/admin-panel'),
-                          icon: const Icon(Icons.admin_panel_settings, size: 18),
+                          icon: Icon(Icons.admin_panel_settings, size: SizeHelper.safeSize(value: 18, min: 12, max: 24, context: 'Button icon size')),
                           label: const Text('Admin Paneli'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: const BorderSide(color: Color(0xFF2196F3)),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Button padding horizontal'),
+                              vertical: SizeHelper.safeSize(value: 8, min: 4, max: 16, context: 'Button padding vertical'),
                             ),
                           ),
                         );
                       } else {
                         return OutlinedButton.icon(
                           onPressed: () => Navigator.pushNamed(context, '/admin-login'),
-                          icon: const Icon(Icons.login, size: 18),
+                          icon: Icon(Icons.login, size: SizeHelper.safeSize(value: 18, min: 12, max: 24, context: 'Button icon size')),
                           label: const Text('Admin Girişi'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Button padding horizontal'),
+                              vertical: SizeHelper.safeSize(value: 8, min: 4, max: 16, context: 'Button padding vertical'),
                             ),
                           ),
                         );
@@ -179,7 +201,7 @@ class _NavItem extends StatelessWidget {
         text,
         style: TextStyle(
           color: Colors.white,
-          fontSize: 16,
+          fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
           fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           decoration: isActive ? TextDecoration.underline : null,
         ),

@@ -27,6 +27,42 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null; // Geçici olarak authenticated kullanıcılar yazabilir
     }
+    
+    // Site settings - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /site_settings/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Contact settings - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /contact_settings/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Announcements - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /announcements/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Teams - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /teams/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Team Members - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /team_members/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Sponsors - herkes okuyabilir, sadece authenticated kullanıcılar yazabilir
+    match /sponsors/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }
 ```
@@ -59,6 +95,37 @@ Etkinlikler burada saklanır:
 - `location` (string): Konum
 - `participants` (number): Katılımcı sayısı
 - `colorHex` (string): Renk hex kodu
+
+### `announcements`
+Duyurular burada saklanır:
+- `type` (string): Duyuru tipi (bölüm, etkinlik, topluluk)
+- `eventName` (string): Etkinlik adı
+- `date` (string): Tarih
+- `address` (string): Adres
+- `posterUrl` (string): Poster görsel URL'i
+- `color` (string): Renk hex kodu
+
+### `teams`
+Ekipler burada saklanır:
+- `name` (string): Ekip adı
+- `description` (string, optional): Ekip açıklaması
+
+### `team_members`
+Ekip üyeleri burada saklanır:
+- `teamId` (string): Ekip ID'si
+- `name` (string): Üye adı
+- `title` (string): Ünvan
+- `department` (string): Bölüm
+- `className` (string, optional): Sınıf
+- `photoUrl` (string, optional): Fotoğraf URL'i
+
+### `sponsors`
+Sponsorlar burada saklanır:
+- `name` (string): Sponsor adı
+- `tier` (string): Sponsor seviyesi (platinum, gold, silver, bronze)
+- `logoUrl` (string): Logo URL'i
+- `description` (string, optional): Açıklama
+- `websiteUrl` (string, optional): Web sitesi URL'i
 
 ## 3. Firebase Console'da Verileri Görüntüleme
 
