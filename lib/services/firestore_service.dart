@@ -59,11 +59,14 @@ class FirestoreService {
   final String _contactSettingsCollection = 'contact_settings';
   final String _contactSettingsDocId = 'main';
   final String _siteSettingsCollection = 'site_settings';
+  final String _statisticsDocId = 'statistics';
   final String _siteSettingsDocId = 'main';
   final String _announcementsCollection = 'announcements';
   final String _teamsCollection = 'teams';
   final String _teamMembersCollection = 'team_members';
   final String _sponsorsCollection = 'sponsors';
+  final String _homeSectionsCollection = 'home_sections';
+  final String _aboutSectionsCollection = 'about_sections';
 
 
   // Get all events
@@ -358,6 +361,7 @@ class FirestoreService {
   // Check if admin is verified
   Future<bool> isAdminVerified(String email) async {
     try {
+      print('🔍 Admin onay durumu kontrol ediliyor: $email');
       // Force server fetch to avoid cache issues
       final query = await _firestore
           .collection(_adminsCollection)
@@ -366,7 +370,7 @@ class FirestoreService {
           .get(const GetOptions(source: Source.server));
       
       if (query.docs.isNotEmpty) {
-        print('🔍 Admin onay durumu kontrolü: $email -> Onaylı (admins koleksiyonunda)');
+        print('✅ Admin onay durumu kontrolü: $email -> Onaylı (admins koleksiyonunda)');
         return true;
       }
       
@@ -392,10 +396,19 @@ class FirestoreService {
         return true;
       }
       
-      print('🔍 Admin onay durumu kontrolü: $email -> Onaylanmamış');
+      print('⚠️ Admin onay durumu kontrolü: $email -> Onaylanmamış');
+      return false;
+    } on FirebaseException catch (e) {
+      print('❌ isAdminVerified FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        print('❌ Firestore izin hatası! Firebase Console\'da Firestore Rules\'ı kontrol edin.');
+        print('❌ admins ve pending_admins koleksiyonları için okuma izni verilmelidir.');
+      }
+      // On error, return false to be safe
       return false;
     } catch (e) {
       print('❌ isAdminVerified hatası: $e');
+      print('❌ Hata tipi: ${e.runtimeType}');
       // On error, return false to be safe
       return false;
     }
@@ -496,12 +509,71 @@ class FirestoreService {
         .set(settings, SetOptions(merge: true));
   }
 
-  // Announcements
-  Stream<List<AnnouncementData>> getAnnouncements() {
+  // Get statistics
+  Future<Map<String, dynamic>> getStatistics() async {
+    final doc = await _firestore
+        .collection(_siteSettingsCollection)
+        .doc(_statisticsDocId)
+        .get();
+    
+    if (!doc.exists) {
+      return {
+        'memberCount': 0,
+        'eventCount': 0,
+        'projectCount': 0,
+        'workshopCount': 0,
+        'memberCountVisible': true,
+        'eventCountVisible': true,
+        'projectCountVisible': true,
+        'workshopCountVisible': true,
+      };
+    }
+    
+    return doc.data()!;
+  }
+
+  // Stream statistics
+  Stream<Map<String, dynamic>> getStatisticsStream() {
     return _firestore
-        .collection(_announcementsCollection)
-        .orderBy('date', descending: true)
+        .collection(_siteSettingsCollection)
+        .doc(_statisticsDocId)
         .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) {
+        return {
+          'memberCount': 0,
+          'eventCount': 0,
+          'projectCount': 0,
+          'workshopCount': 0,
+          'memberCountVisible': true,
+          'eventCountVisible': true,
+          'projectCountVisible': true,
+          'workshopCountVisible': true,
+        };
+      }
+      return snapshot.data()!;
+    });
+  }
+
+  // Update statistics
+  Future<void> updateStatistics(Map<String, dynamic> statistics) async {
+    await _firestore
+        .collection(_siteSettingsCollection)
+        .doc(_statisticsDocId)
+        .set(statistics, SetOptions(merge: true));
+  }
+
+  // Announcements
+  Stream<List<AnnouncementData>> getAnnouncements({int? limit}) {
+    var query = _firestore
+        .collection(_announcementsCollection)
+        .orderBy('date', descending: true);
+    
+    if (limit != null && limit > 0) {
+      query = query.limit(limit);
+    }
+    
+    return query.snapshots()
         .handleError((error) {
       print('❌ getAnnouncements hatası: $error');
       if (error is FirebaseException) {
@@ -526,14 +598,12 @@ class FirestoreService {
     return _firestore
         .collection(_announcementsCollection)
         .where('type', isEqualTo: type)
-        .orderBy('date', descending: true)
+        // orderBy kaldırıldı - index gereksinimini önlemek için client-side sıralama yapılıyor
         .snapshots()
         .handleError((error) {
       print('❌ getAnnouncementsByType hatası: $error');
       if (error is FirebaseException) {
-        if (error.code == 'failed-precondition') {
-          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
-        } else if (error.code == 'permission-denied') {
+        if (error.code == 'permission-denied') {
           throw 'Firestore izin hatası. Duyurular koleksiyonu için okuma izni verilmelidir.';
         } else if (error.code == 'unavailable') {
           throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
@@ -542,9 +612,13 @@ class FirestoreService {
       throw 'Duyurular yüklenirken bir hata oluştu: $error';
     })
         .map((snapshot) {
-      return snapshot.docs
+      // Client-side sıralama - index gerektirmez
+      final announcements = snapshot.docs
           .map((doc) => AnnouncementData.fromFirestore(doc))
           .toList();
+      // Tarihe göre ters sıralama (en yeni önce)
+      announcements.sort((a, b) => b.date.compareTo(a.date));
+      return announcements;
     });
   }
 
@@ -704,14 +778,12 @@ class FirestoreService {
     return _firestore
         .collection(_teamMembersCollection)
         .where('teamId', isEqualTo: teamId)
-        .orderBy('name', descending: false)
+        // orderBy kaldırıldı - index gereksinimini önlemek için client-side sıralama yapılıyor
         .snapshots()
         .handleError((error) {
       print('❌ getTeamMembers hatası: $error');
       if (error is FirebaseException) {
-        if (error.code == 'failed-precondition') {
-          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
-        } else if (error.code == 'permission-denied') {
+        if (error.code == 'permission-denied') {
           throw 'Firestore izin hatası. Ekip üyeleri koleksiyonu için okuma izni verilmelidir.';
         } else if (error.code == 'unavailable') {
           throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
@@ -720,9 +792,13 @@ class FirestoreService {
       throw 'Ekip üyeleri yüklenirken bir hata oluştu: $error';
     })
         .map((snapshot) {
-      return snapshot.docs
+      // Client-side sıralama - index gerektirmez
+      final members = snapshot.docs
           .map((doc) => TeamMemberData.fromFirestore(doc))
           .toList();
+      // İsme göre alfabetik sıralama
+      members.sort((a, b) => a.name.compareTo(b.name));
+      return members;
     });
   }
 
@@ -889,6 +965,197 @@ class FirestoreService {
     await _firestore.collection(_sponsorsCollection).doc(sponsorId).delete();
   }
 
+  // Home Sections
+  Stream<List<HomeSectionData>> getHomeSections() {
+    return _firestore
+        .collection(_homeSectionsCollection)
+        .orderBy('order', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getHomeSections hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Anasayfa bölümleri koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Anasayfa bölümleri yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => HomeSectionData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addHomeSection(HomeSectionData section) async {
+    try {
+      await _firestore.collection(_homeSectionsCollection).add(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addHomeSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'home_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Anasayfa bölümü eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addHomeSection hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addHomeSectionAndGetRef(HomeSectionData section) async {
+    try {
+      return await _firestore.collection(_homeSectionsCollection).add(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addHomeSectionAndGetRef FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'home_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Anasayfa bölümü eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addHomeSectionAndGetRef hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateHomeSection(String sectionId, HomeSectionData section) async {
+    try {
+      await _firestore
+          .collection(_homeSectionsCollection)
+          .doc(sectionId)
+          .update(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ updateHomeSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'home_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Anasayfa bölümü güncellenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ updateHomeSection hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteHomeSection(String sectionId) async {
+    try {
+      await _firestore.collection(_homeSectionsCollection).doc(sectionId).delete();
+    } on FirebaseException catch (e) {
+      print('❌ deleteHomeSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'home_sections koleksiyonu için silme izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Anasayfa bölümü silinirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ deleteHomeSection hatası: $e');
+      rethrow;
+    }
+  }
+
+  // About Sections
+  Stream<List<AboutSectionData>> getAboutSections() {
+    return _firestore
+        .collection(_aboutSectionsCollection)
+        .orderBy('order', descending: false)
+        .snapshots()
+        .handleError((error) {
+      print('❌ getAboutSections hatası: $error');
+      if (error is FirebaseException) {
+        if (error.code == 'failed-precondition') {
+          throw 'Firestore index hatası. Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.';
+        } else if (error.code == 'permission-denied') {
+          throw 'Firestore izin hatası. Hakkımızda bölümleri koleksiyonu için okuma izni verilmelidir.';
+        } else if (error.code == 'unavailable') {
+          throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+        }
+      }
+      throw 'Hakkımızda bölümleri yüklenirken bir hata oluştu: $error';
+    })
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => AboutSectionData.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  Future<void> addAboutSection(AboutSectionData section) async {
+    try {
+      await _firestore.collection(_aboutSectionsCollection).add(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addAboutSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'about_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Hakkımızda bölümü eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addAboutSection hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateAboutSection(String sectionId, AboutSectionData section) async {
+    try {
+      await _firestore
+          .collection(_aboutSectionsCollection)
+          .doc(sectionId)
+          .update(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ updateAboutSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'about_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Hakkımızda bölümü güncellenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ updateAboutSection hatası: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAboutSection(String sectionId) async {
+    try {
+      await _firestore.collection(_aboutSectionsCollection).doc(sectionId).delete();
+    } on FirebaseException catch (e) {
+      print('❌ deleteAboutSection FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'about_sections koleksiyonu için silme izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Hakkımızda bölümü silinirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ deleteAboutSection hatası: $e');
+      rethrow;
+    }
+  }
+
 }
 
 class EventData {
@@ -901,6 +1168,8 @@ class EventData {
   final int participants;
   final String colorHex;
   final List<String> images;
+  final String? registrationFormLink; // Katılım formu linki (isteğe bağlı)
+  final Map<String, double>? locationCoordinates; // Konum koordinatları {latitude: double, longitude: double} (isteğe bağlı)
 
   EventData({
     this.id,
@@ -912,10 +1181,12 @@ class EventData {
     required this.participants,
     required this.colorHex,
     this.images = const [],
+    this.registrationFormLink,
+    this.locationCoordinates,
   });
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'type': type,
       'title': title,
       'date': date,
@@ -925,10 +1196,27 @@ class EventData {
       'colorHex': colorHex,
       'images': images,
     };
+    if (registrationFormLink != null && registrationFormLink!.isNotEmpty) {
+      map['registrationFormLink'] = registrationFormLink;
+    }
+    if (locationCoordinates != null) {
+      map['locationCoordinates'] = Map<String, dynamic>.from(
+        locationCoordinates!.map((key, value) => MapEntry(key, value)),
+      );
+    }
+    return map;
   }
 
   factory EventData.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    Map<String, double>? coordinates;
+    if (data['locationCoordinates'] != null) {
+      final coordsData = data['locationCoordinates'] as Map<String, dynamic>;
+      coordinates = {
+        'latitude': (coordsData['latitude'] ?? coordsData['lat'] ?? 0.0).toDouble(),
+        'longitude': (coordsData['longitude'] ?? coordsData['lng'] ?? coordsData['lon'] ?? 0.0).toDouble(),
+      };
+    }
     return EventData(
       id: doc.id,
       type: data['type'] ?? '',
@@ -939,6 +1227,8 @@ class EventData {
       participants: data['participants'] ?? 0,
       colorHex: data['colorHex'] ?? '#2196F3',
       images: List<String>.from(data['images'] ?? []),
+      registrationFormLink: data['registrationFormLink'] as String?,
+      locationCoordinates: coordinates,
     );
   }
 
@@ -956,6 +1246,8 @@ class EventData {
     int? participants,
     String? colorHex,
     List<String>? images,
+    String? registrationFormLink,
+    Map<String, double>? locationCoordinates,
   }) {
     return EventData(
       id: id ?? this.id,
@@ -967,6 +1259,8 @@ class EventData {
       participants: participants ?? this.participants,
       colorHex: colorHex ?? this.colorHex,
       images: images ?? this.images,
+      registrationFormLink: registrationFormLink ?? this.registrationFormLink,
+      locationCoordinates: locationCoordinates ?? this.locationCoordinates,
     );
   }
 }
@@ -979,6 +1273,7 @@ class AnnouncementData {
   final String date; // Tarih
   final String address; // Adres
   final String? description; // Açıklama (opsiyonel)
+  final String? link; // Link (opsiyonel)
   final String colorHex; // Renk hex kodu
 
   AnnouncementData({
@@ -989,6 +1284,7 @@ class AnnouncementData {
     required this.date,
     required this.address,
     this.description,
+    this.link,
     this.colorHex = '#2196F3',
   });
 
@@ -1000,6 +1296,7 @@ class AnnouncementData {
       'date': date,
       'address': address,
       'description': description ?? '',
+      'link': link ?? '',
       'colorHex': colorHex,
     };
   }
@@ -1014,6 +1311,7 @@ class AnnouncementData {
       date: data['date'] ?? '',
       address: data['address'] ?? '',
       description: data['description'],
+      link: data['link'],
       colorHex: data['colorHex'] ?? '#2196F3',
     );
   }
@@ -1030,6 +1328,7 @@ class AnnouncementData {
     String? date,
     String? address,
     String? description,
+    String? link,
     String? colorHex,
   }) {
     return AnnouncementData(
@@ -1040,6 +1339,7 @@ class AnnouncementData {
       date: date ?? this.date,
       address: address ?? this.address,
       description: description ?? this.description,
+      link: link ?? this.link,
       colorHex: colorHex ?? this.colorHex,
     );
   }
@@ -1087,7 +1387,7 @@ class TeamData {
 
 class TeamMemberData {
   final String? id;
-  final String teamId;
+  final String? teamId;
   final String name;
   final String department; // Bölüm
   final String? className; // Sınıf
@@ -1096,7 +1396,7 @@ class TeamMemberData {
 
   TeamMemberData({
     this.id,
-    required this.teamId,
+    this.teamId,
     required this.name,
     required this.department,
     this.className,
@@ -1106,7 +1406,7 @@ class TeamMemberData {
 
   Map<String, dynamic> toMap() {
     return {
-      'teamId': teamId,
+      'teamId': teamId ?? '',
       'name': name,
       'department': department,
       'className': className ?? '',
@@ -1117,14 +1417,25 @@ class TeamMemberData {
 
   factory TeamMemberData.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final photoUrl = data['photoUrl'];
+    final name = data['name'] ?? '';
+    final teamIdValue = data['teamId'];
+    
+    // Debug log
+    if (photoUrl != null && photoUrl.toString().isNotEmpty) {
+      print('📸 TeamMemberData.fromFirestore - $name: photoUrl var (${photoUrl.toString().substring(0, photoUrl.toString().length > 50 ? 50 : photoUrl.toString().length)}...)');
+    } else {
+      print('⚠️ TeamMemberData.fromFirestore - $name: photoUrl yok veya boş');
+    }
+    
     return TeamMemberData(
       id: doc.id,
-      teamId: data['teamId'] ?? '',
-      name: data['name'] ?? '',
+      teamId: teamIdValue == null || teamIdValue.toString().isEmpty ? null : teamIdValue.toString(),
+      name: name,
       department: data['department'] ?? '',
       className: data['className'],
       title: data['title'] ?? '',
-      photoUrl: data['photoUrl'],
+      photoUrl: photoUrl?.toString().isEmpty == true ? null : photoUrl?.toString(),
     );
   }
 
@@ -1155,6 +1466,7 @@ class SponsorData {
   final String? description;
   final String logoUrl;
   final String? websiteUrl;
+  final String? address; // Sponsor adresi (opsiyonel, harita için)
   final String tier; // 'platinum', 'gold', 'silver', 'bronze'
   final int? order; // Sıralama için
 
@@ -1164,6 +1476,7 @@ class SponsorData {
     this.description,
     required this.logoUrl,
     this.websiteUrl,
+    this.address,
     this.tier = 'bronze',
     this.order,
   });
@@ -1174,6 +1487,7 @@ class SponsorData {
       'description': description ?? '',
       'logoUrl': logoUrl,
       'websiteUrl': websiteUrl ?? '',
+      'address': address ?? '',
       'tier': tier,
       'order': order ?? 0,
     };
@@ -1187,6 +1501,7 @@ class SponsorData {
       description: data['description'],
       logoUrl: data['logoUrl'] ?? '',
       websiteUrl: data['websiteUrl'],
+      address: data['address'],
       tier: data['tier'] ?? 'bronze',
       order: data['order'],
     );
@@ -1213,6 +1528,7 @@ class SponsorData {
     String? description,
     String? logoUrl,
     String? websiteUrl,
+    String? address,
     String? tier,
     int? order,
   }) {
@@ -1222,8 +1538,153 @@ class SponsorData {
       description: description ?? this.description,
       logoUrl: logoUrl ?? this.logoUrl,
       websiteUrl: websiteUrl ?? this.websiteUrl,
+      address: address ?? this.address,
       tier: tier ?? this.tier,
       order: order ?? this.order,
+    );
+  }
+}
+
+class HomeSectionData {
+  final String? id;
+  final String? title; // Başlık (opsiyonel)
+  final String? description; // Açıklama (opsiyonel)
+  final List<String> images; // Resim URL'leri listesi
+  final int order; // Sıralama
+  final bool visible; // Görünürlük
+
+  HomeSectionData({
+    this.id,
+    this.title,
+    this.description,
+    this.images = const [],
+    this.order = 0,
+    this.visible = true,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title ?? '',
+      'description': description ?? '',
+      'images': images,
+      'order': order,
+      'visible': visible,
+    };
+  }
+
+  factory HomeSectionData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    // Eski format desteği (imageUrl varsa images listesine ekle)
+    List<String> imageList = [];
+    if (data['images'] != null) {
+      imageList = List<String>.from(data['images']);
+    } else if (data['imageUrl'] != null && (data['imageUrl'] as String).isNotEmpty) {
+      // Eski format: imageUrl -> images listesine dönüştür
+      imageList = [data['imageUrl'] as String];
+    }
+    
+    return HomeSectionData(
+      id: doc.id,
+      title: data['title']?.toString().isEmpty == true ? null : data['title']?.toString(),
+      description: data['description']?.toString().isEmpty == true ? null : data['description']?.toString(),
+      images: imageList,
+      order: (data['order'] ?? 0) as int,
+      visible: data['visible'] ?? true,
+    );
+  }
+
+  HomeSectionData copyWith({
+    String? id,
+    String? title,
+    String? description,
+    List<String>? images,
+    int? order,
+    bool? visible,
+  }) {
+    return HomeSectionData(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      images: images ?? this.images,
+      order: order ?? this.order,
+      visible: visible ?? this.visible,
+    );
+  }
+}
+
+// About Section Data Model
+class AboutSectionData {
+  final String? id;
+  final String title;
+  final String subtitle;
+  final String description;
+  final String imageUrl;
+  final bool isImageRight;
+  final String accentColor; // Hex color code (e.g., "#2196F3")
+  final int order; // Sıralama
+  final bool visible; // Görünürlük
+
+  AboutSectionData({
+    this.id,
+    required this.title,
+    required this.subtitle,
+    required this.description,
+    required this.imageUrl,
+    required this.isImageRight,
+    required this.accentColor,
+    this.order = 0,
+    this.visible = true,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'subtitle': subtitle,
+      'description': description,
+      'imageUrl': imageUrl,
+      'isImageRight': isImageRight,
+      'accentColor': accentColor,
+      'order': order,
+      'visible': visible,
+    };
+  }
+
+  factory AboutSectionData.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return AboutSectionData(
+      id: doc.id,
+      title: data['title'] ?? '',
+      subtitle: data['subtitle'] ?? '',
+      description: data['description'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
+      isImageRight: data['isImageRight'] ?? true,
+      accentColor: data['accentColor'] ?? '#2196F3',
+      order: (data['order'] ?? 0) as int,
+      visible: data['visible'] ?? true,
+    );
+  }
+
+  AboutSectionData copyWith({
+    String? id,
+    String? title,
+    String? subtitle,
+    String? description,
+    String? imageUrl,
+    bool? isImageRight,
+    String? accentColor,
+    int? order,
+    bool? visible,
+  }) {
+    return AboutSectionData(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isImageRight: isImageRight ?? this.isImageRight,
+      accentColor: accentColor ?? this.accentColor,
+      order: order ?? this.order,
+      visible: visible ?? this.visible,
     );
   }
 }

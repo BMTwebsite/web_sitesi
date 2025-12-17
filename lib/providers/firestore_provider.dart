@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/firestore_service.dart';
 
-// Re-export EventData, AnnouncementData, TeamData, TeamMemberData, and SponsorData for convenience
-export '../services/firestore_service.dart' show EventData, AnnouncementData, TeamData, TeamMemberData, SponsorData;
+// Re-export EventData, AnnouncementData, TeamData, TeamMemberData, SponsorData, HomeSectionData, and AboutSectionData for convenience
+export '../services/firestore_service.dart' show EventData, AnnouncementData, TeamData, TeamMemberData, SponsorData, HomeSectionData, AboutSectionData;
 
 class FirestoreProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
@@ -229,9 +229,39 @@ class FirestoreProvider with ChangeNotifier {
     }
   }
 
+  // Statistics
+  Stream<Map<String, dynamic>> getStatisticsStream() {
+    return _firestoreService.getStatisticsStream();
+  }
+
+  Future<Map<String, dynamic>> getStatistics() async {
+    try {
+      return await _firestoreService.getStatistics();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateStatistics(Map<String, dynamic> statistics) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateStatistics(statistics);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   // Announcements
-  Stream<List<AnnouncementData>> getAnnouncements() {
-    return _firestoreService.getAnnouncements();
+  Stream<List<AnnouncementData>> getAnnouncements({int? limit}) {
+    return _firestoreService.getAnnouncements(limit: limit);
   }
 
   Stream<List<AnnouncementData>> getAnnouncementsByType(String type) {
@@ -491,6 +521,122 @@ class FirestoreProvider with ChangeNotifier {
       _setLoading(true);
       _error = null;
       await _firestoreService.deleteSponsor(sponsorId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Home Sections
+  Stream<List<HomeSectionData>> getHomeSections() {
+    return _firestoreService.getHomeSections();
+  }
+
+  Future<void> addHomeSection(HomeSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addHomeSection(section);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addHomeSectionAndGetRef(HomeSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addHomeSectionAndGetRef(section);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateHomeSection(String sectionId, HomeSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateHomeSection(sectionId, section);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteHomeSection(String sectionId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteHomeSection(sectionId);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // About Sections
+  Stream<List<AboutSectionData>> getAboutSections() {
+    return _firestoreService.getAboutSections();
+  }
+
+  Future<void> addAboutSection(AboutSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.addAboutSection(section);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateAboutSection(String sectionId, AboutSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.updateAboutSection(sectionId, section);
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAboutSection(String sectionId) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      await _firestoreService.deleteAboutSection(sectionId);
       _setLoading(false);
       notifyListeners();
     } catch (e) {

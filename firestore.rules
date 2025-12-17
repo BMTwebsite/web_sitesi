@@ -53,6 +53,16 @@ service cloud.firestore {
     match /sponsors/{document=**} {
       allow read, write: if true;
     }
+    
+    // Home Sections - herkes okuyabilir, herkes yazabilir (test için)
+    match /home_sections/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // About Sections - herkes okuyabilir, herkes yazabilir (test için)
+    match /about_sections/{document=**} {
+      allow read, write: if true;
+    }
   }
 }
 

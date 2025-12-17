@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/image_viewer_dialog.dart';
 import '../providers/firestore_provider.dart';
 import '../utils/size_helper.dart';
 import 'dart:html' as html;
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:ui_web' as ui_web;
 
 class SponsorsPage extends StatelessWidget {
   const SponsorsPage({super.key});
@@ -13,10 +18,19 @@ class SponsorsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Header(currentRoute: '/sponsor'),
+      body: CustomScrollView(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            floating: false,
+            delegate: HeaderSliverDelegate(
+              child: const Header(currentRoute: '/sponsor'),
+              context: context,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -30,10 +44,9 @@ class SponsorsPage extends StatelessWidget {
                   stops: const [0.0, 0.5, 1.0],
                 ),
               ),
-              padding: SizeHelper.safePadding(
-                context: context,
-                horizontal: 60,
-                vertical: 60,
+              padding: EdgeInsets.symmetric(
+                horizontal: SizeHelper.isMobile(context) ? 16 : (SizeHelper.isTablet(context) ? 32 : 60),
+                vertical: SizeHelper.isMobile(context) ? 40 : (SizeHelper.isTablet(context) ? 50 : 60),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,17 +85,29 @@ class SponsorsPage extends StatelessWidget {
                     'Sponsorlarımız',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 48),
+                      fontSize: SizeHelper.clampFontSize(
+                        MediaQuery.of(context).size.width,
+                        28,
+                        38,
+                        48,
+                      ),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: SizeHelper.isMobile(context) ? 12 : 16),
                   Text(
                     'Bizi destekleyen değerli sponsorlarımıza teşekkür ederiz',
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
+                      fontSize: SizeHelper.clampFontSize(
+                        MediaQuery.of(context).size.width,
+                        14,
+                        16,
+                        18,
+                      ),
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 40),
                   Consumer<FirestoreProvider>(
@@ -101,38 +126,54 @@ class SponsorsPage extends StatelessWidget {
 
                           if (snapshot.hasError) {
                             final errorMessage = snapshot.error.toString();
+                            final screenWidth = MediaQuery.of(context).size.width;
+                            final isMobile = SizeHelper.isMobile(context);
                             return Center(
                               child: Padding(
-                                padding: const EdgeInsets.all(40),
+                                padding: EdgeInsets.all(isMobile ? 20 : 40),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.error_outline,
                                       color: Colors.red,
-                                      size: 48,
+                                      size: SizeHelper.clampFontSize(screenWidth, 32, 40, 48),
                                     ),
-                                    const SizedBox(height: 16),
+                                    SizedBox(height: isMobile ? 12 : 16),
                                     Text(
                                       'Sponsorlar yüklenirken bir hata oluştu',
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: SizeHelper.safeFontSize(context, preferredSize: 20),
+                                        fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
                                         fontWeight: FontWeight.bold,
                                       ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 8),
+                                    SizedBox(height: isMobile ? 8 : 12),
                                     Text(
                                       errorMessage,
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Colors.red),
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: SizeHelper.clampFontSize(screenWidth, 11, 13, 15),
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     if (errorMessage.contains('index')) ...[
-                                      const SizedBox(height: 16),
-                                      const Text(
+                                      SizedBox(height: isMobile ? 12 : 16),
+                                      Text(
                                         'Firebase Console\'da gerekli index\'i oluşturmanız gerekiyor.',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.white70),
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: SizeHelper.clampFontSize(screenWidth, 11, 13, 15),
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ],
@@ -142,63 +183,50 @@ class SponsorsPage extends StatelessWidget {
                           }
 
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(40),
-                                child: Text(
-                                  'Henüz sponsor eklenmemiş.',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
-                                  ),
-                                ),
-                              ),
+                            return const EmptyState(
+                              message: 'Henüz sponsor eklenmemiş.',
+                              icon: Icons.business_center,
                             );
                           }
 
                           final sponsors = snapshot.data!;
-                          
-                          // Sponsorları tier'a göre grupla
-                          final platinumSponsors = sponsors.where((s) => s.tier.toLowerCase() == 'platinum').toList();
-                          final goldSponsors = sponsors.where((s) => s.tier.toLowerCase() == 'gold').toList();
-                          final silverSponsors = sponsors.where((s) => s.tier.toLowerCase() == 'silver').toList();
-                          final bronzeSponsors = sponsors.where((s) => s.tier.toLowerCase() == 'bronze').toList();
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (platinumSponsors.isNotEmpty) ...[
-                                _SponsorTierSection(
-                                  title: 'Platin Sponsorlar',
-                                  sponsors: platinumSponsors,
-                                  tierColor: const Color(0xFFE5E4E2),
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              final screenWidth = MediaQuery.of(context).size.width;
+                              int crossAxisCount;
+                              double aspectRatio;
+                              double spacing;
+                              
+                              if (screenWidth < 600) {
+                                crossAxisCount = 1;
+                                aspectRatio = 0.9;
+                                spacing = 16;
+                              } else if (screenWidth < 1024) {
+                                crossAxisCount = 2;
+                                aspectRatio = 1.0;
+                                spacing = 18;
+                              } else {
+                                crossAxisCount = screenWidth > 1400 ? 4 : 3;
+                                aspectRatio = 1.0;
+                                spacing = 20;
+                              }
+                              
+                              return GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: spacing,
+                                  mainAxisSpacing: spacing,
+                                  childAspectRatio: aspectRatio,
                                 ),
-                                const SizedBox(height: 40),
-                              ],
-                              if (goldSponsors.isNotEmpty) ...[
-                                _SponsorTierSection(
-                                  title: 'Altın Sponsorlar',
-                                  sponsors: goldSponsors,
-                                  tierColor: const Color(0xFFFFD700),
-                                ),
-                                const SizedBox(height: 40),
-                              ],
-                              if (silverSponsors.isNotEmpty) ...[
-                                _SponsorTierSection(
-                                  title: 'Gümüş Sponsorlar',
-                                  sponsors: silverSponsors,
-                                  tierColor: const Color(0xFFC0C0C0),
-                                ),
-                                const SizedBox(height: 40),
-                              ],
-                              if (bronzeSponsors.isNotEmpty) ...[
-                                _SponsorTierSection(
-                                  title: 'Bronz Sponsorlar',
-                                  sponsors: bronzeSponsors,
-                                  tierColor: const Color(0xFFCD7F32),
-                                ),
-                              ],
-                            ],
+                                itemCount: sponsors.length,
+                                itemBuilder: (context, index) {
+                                  return _SponsorCard(sponsor: sponsors[index]);
+                                },
+                              );
+                            },
                           );
                         },
                       );
@@ -207,78 +235,21 @@ class SponsorsPage extends StatelessWidget {
                 ],
               ),
             ),
-            const Footer(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SponsorTierSection extends StatelessWidget {
-  final String title;
-  final List<SponsorData> sponsors;
-  final Color tierColor;
-
-  const _SponsorTierSection({
-    required this.title,
-    required this.sponsors,
-    required this.tierColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 30,
-              decoration: BoxDecoration(
-                color: tierColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                const Footer(),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: SizeHelper.safeFontSize(context, preferredSize: 28),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 4),
-            crossAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-            mainAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-            childAspectRatio: SizeHelper.safeSize(value: 1.2, min: 0.8, max: 1.5, context: 'Grid aspect ratio'),
           ),
-          itemCount: sponsors.length,
-          itemBuilder: (context, index) {
-            return _SponsorCard(sponsor: sponsors[index], tierColor: tierColor);
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _SponsorCard extends StatelessWidget {
   final SponsorData sponsor;
-  final Color tierColor;
 
   const _SponsorCard({
     required this.sponsor,
-    required this.tierColor,
   });
 
   @override
@@ -295,66 +266,108 @@ class _SponsorCard extends StatelessWidget {
           color: const Color(0xFF0A0E17),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: tierColor.withOpacity(0.3),
+            color: const Color(0xFF2196F3).withOpacity(0.3),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: tierColor.withOpacity(0.1),
+              color: const Color(0xFF2196F3).withOpacity(0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Logo
               Expanded(
+                flex: 3,
                 child: Container(
-                  width: SizeHelper.safeInfinity(context, isWidth: true),
+                  width: double.infinity,
+                  constraints: BoxConstraints(
+                    maxHeight: SizeHelper.isMobile(context) ? 140 : 160,
+                    minHeight: 80,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withOpacity(0.08),
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
                   child: sponsor.logoUrl.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            sponsor.logoUrl,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                padding: const EdgeInsets.all(20),
-                                child: Icon(
-                                  Icons.business,
-                                  color: tierColor,
-                                  size: 60,
+                      ? GestureDetector(
+                          onTap: () {
+                            ImageViewerDialog.show(context, sponsor.logoUrl, title: sponsor.name);
+                          },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Container(
+                              padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  sponsor.logoUrl,
+                                  fit: BoxFit.contain,
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(20),
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded /
+                                                  loadingProgress.expectedTotalBytes!
+                                              : null,
+                                          color: const Color(0xFF2196F3),
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
+                                      child: Icon(
+                                        Icons.business,
+                                        color: const Color(0xFF2196F3),
+                                        size: SizeHelper.isMobile(context) ? 40 : 48,
+                                      ),
+                                    );
+                                  },
                                 ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
                         )
                       : Container(
-                          padding: const EdgeInsets.all(20),
+                          padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
                           child: Icon(
                             Icons.business,
-                            color: tierColor,
-                            size: 60,
+                            color: const Color(0xFF2196F3),
+                            size: SizeHelper.isMobile(context) ? 40 : 48,
                           ),
                         ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: SizeHelper.isMobile(context) ? 10 : 12),
               // Sponsor Adı
               Text(
                 sponsor.name,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
+                  fontSize: SizeHelper.clampFontSize(
+                    MediaQuery.of(context).size.width,
+                    12,
+                    14,
+                    16,
+                  ),
                   fontWeight: FontWeight.bold,
                 ),
                 maxLines: 2,
@@ -362,13 +375,18 @@ class _SponsorCard extends StatelessWidget {
               ),
               // Açıklama (varsa)
               if (sponsor.description != null && sponsor.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: SizeHelper.isMobile(context) ? 5 : 6),
                 Text(
                   sponsor.description!,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white60,
-                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 12),
+                    fontSize: SizeHelper.clampFontSize(
+                      MediaQuery.of(context).size.width,
+                      10,
+                      11,
+                      13,
+                    ),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -376,22 +394,83 @@ class _SponsorCard extends StatelessWidget {
               ],
               // Website linki varsa göster
               if (sponsor.websiteUrl != null && sponsor.websiteUrl!.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: SizeHelper.isMobile(context) ? 5 : 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.link,
-                      color: tierColor,
-                      size: 16,
+                      color: const Color(0xFF2196F3),
+                      size: SizeHelper.isMobile(context) ? 12 : 14,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Web Sitesi',
-                      style: TextStyle(
-                        color: tierColor,
-                        fontSize: SizeHelper.safeFontSize(context, preferredSize: 12),
-                        fontWeight: FontWeight.w500,
+                    SizedBox(width: SizeHelper.isMobile(context) ? 3 : 4),
+                    Flexible(
+                      child: Text(
+                        'Web Sitesi',
+                        style: TextStyle(
+                          color: const Color(0xFF2196F3),
+                          fontSize: SizeHelper.clampFontSize(
+                            MediaQuery.of(context).size.width,
+                            9,
+                            11,
+                            13,
+                          ),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              // Adres varsa harita göster
+              if (sponsor.address != null && sponsor.address!.isNotEmpty) ...[
+                SizedBox(height: SizeHelper.isMobile(context) ? 8 : 10),
+                Container(
+                  height: SizeHelper.isMobile(context) ? 120 : 150,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildMapWidget(sponsor.address!),
+                  ),
+                ),
+                SizedBox(height: SizeHelper.isMobile(context) ? 4 : 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: const Color(0xFF2196F3),
+                      size: SizeHelper.isMobile(context) ? 12 : 14,
+                    ),
+                    SizedBox(width: SizeHelper.isMobile(context) ? 3 : 4),
+                    Flexible(
+                      child: Text(
+                        sponsor.address!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: const Color(0xFF2196F3),
+                          fontSize: SizeHelper.clampFontSize(
+                            MediaQuery.of(context).size.width,
+                            9,
+                            10,
+                            12,
+                          ),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -402,6 +481,30 @@ class _SponsorCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildMapWidget(String address) {
+    // Google Maps embed URL oluştur
+    final encodedAddress = Uri.encodeComponent(address);
+    final mapUrl = 'https://www.google.com/maps?q=$encodedAddress&output=embed';
+    
+    // Unique view ID oluştur
+    final viewId = 'sponsor-map-${address.hashCode}';
+    
+    // Platform view registry'ye kaydet
+    ui_web.platformViewRegistry.registerViewFactory(
+      viewId,
+      (int id) {
+        final iframe = html.IFrameElement()
+          ..src = mapUrl
+          ..style.border = 'none'
+          ..style.width = '100%'
+          ..style.height = '100%';
+        return iframe;
+      },
+    );
+    
+    return HtmlElementView(viewType: viewId);
   }
 }
 

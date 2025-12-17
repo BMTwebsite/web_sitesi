@@ -18,14 +18,25 @@ class ContactPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Header(currentRoute: '/contact'),
-            _ContactContent(),
-            const Footer(),
-          ],
-        ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            floating: false,
+            delegate: HeaderSliverDelegate(
+              child: const Header(currentRoute: '/contact'),
+              context: context,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _ContactContent(),
+                const Footer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -93,7 +104,7 @@ class _ContactContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
+    final isMobile = SizeHelper.isMobile(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -108,10 +119,9 @@ class _ContactContent extends StatelessWidget {
           stops: const [0.0, 0.5, 1.0],
         ),
       ),
-      padding: SizeHelper.safePadding(
-        context: context,
-        horizontal: isMobile ? 20 : 60,
-        vertical: isMobile ? 40 : 60,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : (screenWidth < 1024 ? 32 : 60),
+        vertical: isMobile ? 40 : (screenWidth < 1024 ? 50 : 60),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,19 +164,19 @@ class _ContactContent extends StatelessWidget {
                   'İletişim',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: SizeHelper.safeFontSize(
-                      context,
-                      preferredSize: isMobile ? 40 : 56,
-                    ),
+                    fontSize: SizeHelper.clampFontSize(screenWidth, 28, 40, 56),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isMobile ? 12 : 16),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 0),
-                  child: const Text(
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0),
+                  child: Text(
                     'Bizimle iletişime geçin ve sorularınızı bize iletin',
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -180,24 +190,33 @@ class _ContactContent extends StatelessWidget {
             stream: _firestoreService.getContactSettingsStream(),
             builder: (context, snapshot) {
               final email = snapshot.data?['email'] ?? '';
-              final socialMediaList = _parseSocialMedia(
-                snapshot.data?['socialMedia'],
-              );
+              final rawSocialMedia = snapshot.data?['socialMedia'];
+              print('📥 İletişim sayfası - Ham sosyal medya verisi: $rawSocialMedia');
+              final socialMediaList = _parseSocialMedia(rawSocialMedia);
+              print('📱 İletişim sayfası - Parse edilmiş sosyal medya listesi: ${socialMediaList.length} öğe');
+              for (var item in socialMediaList) {
+                print('  - ${item.name}: ${item.url}');
+              }
 
-              return isMobile
-                  ? Column(
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobileLayout = constraints.maxWidth < 1024;
+                  
+                  if (isMobileLayout) {
+                    // Mobile/Tablet: Column layout
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // İletişim Bilgileri
-                        const Text(
+                        Text(
                           'İletişim Bilgileri',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 28,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 22, 26, 28),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: isMobile ? 16 : 20),
                         if (email.isNotEmpty)
                           _ContactInfoCard(
                             icon: Icons.email,
@@ -214,8 +233,7 @@ class _ContactContent extends StatelessWidget {
                               }
                             },
                           ),
-                        if (email.isNotEmpty) const SizedBox(height: 20),
-                        const SizedBox(height: 20),
+                        if (email.isNotEmpty) SizedBox(height: isMobile ? 16 : 20),
                         StreamBuilder<Map<String, dynamic>>(
                           stream: _firestoreService.getSiteSettingsStream(),
                           builder: (context, siteSnapshot) {
@@ -241,40 +259,69 @@ class _ContactContent extends StatelessWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 40),
+                        SizedBox(height: isMobile ? 30 : 40),
                         // Sosyal Medya
-                        const Text(
+                        Text(
                           'Sosyal Medya Hesaplarımız',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 28,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 22, 26, 28),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
+                        SizedBox(height: isMobile ? 12 : 16),
+                        Text(
                           'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 13, 15, 16),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 20),
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 2),
-                                crossAxisSpacing: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Grid spacing'),
-                                mainAxisSpacing: SizeHelper.safeSize(value: 16, min: 8, max: 32, context: 'Grid spacing'),
-                                childAspectRatio: SizeHelper.safeSize(value: 1.1, min: 0.8, max: 1.5, context: 'Grid aspect ratio'),
+                        SizedBox(height: isMobile ? 16 : 20),
+                        LayoutBuilder(
+                          builder: (context, gridConstraints) {
+                            final gridWidth = gridConstraints.maxWidth;
+                            int crossAxisCount;
+                            double aspectRatio;
+                            double spacing;
+                            
+                            if (gridWidth < 600) {
+                              crossAxisCount = 1;
+                              aspectRatio = 1.0;
+                              spacing = 12;
+                            } else if (gridWidth < 1024) {
+                              crossAxisCount = 2;
+                              aspectRatio = 1.1;
+                              spacing = 16;
+                            } else {
+                              crossAxisCount = 2;
+                              aspectRatio = 1.1;
+                              spacing = 20;
+                            }
+                            
+                            return GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: spacing,
+                                mainAxisSpacing: spacing,
+                                childAspectRatio: aspectRatio,
                               ),
-                          itemCount: socialMediaList.length,
-                          itemBuilder: (context, index) {
-                            return _SocialMediaCard(socialMediaList[index]);
+                              itemCount: socialMediaList.length,
+                              itemBuilder: (context, index) {
+                                return _SocialMediaCard(socialMediaList[index]);
+                              },
+                            );
                           },
                         ),
                       ],
-                    )
-                  : Row(
+                    );
+                  } else {
+                    // Desktop: Row layout
+                    return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Sol Taraf - İletişim Bilgileri
@@ -283,11 +330,11 @@ class _ContactContent extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'İletişim Bilgileri',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 32,
+                                  fontSize: SizeHelper.clampFontSize(screenWidth, 24, 28, 32),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -337,18 +384,18 @@ class _ContactContent extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 40),
+                        SizedBox(width: isMobile ? 20 : 40),
                         // Sağ Taraf - Sosyal Medya
                         Expanded(
                           flex: 1,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Sosyal Medya Hesaplarımız',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 32,
+                                  fontSize: SizeHelper.clampFontSize(screenWidth, 24, 28, 32),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -357,25 +404,24 @@ class _ContactContent extends StatelessWidget {
                                 'Bizi sosyal medyada takip edin ve güncel haberlerden haberdar olun',
                                 style: TextStyle(
                                   color: Colors.white70,
-                                  fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
+                                  fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 30),
                               GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 2),
-                                crossAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-                                mainAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-                                childAspectRatio: SizeHelper.safeSize(value: 1.2, min: 0.8, max: 1.5, context: 'Grid aspect ratio'),
-                              ),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 20,
+                                  mainAxisSpacing: 20,
+                                  childAspectRatio: 1.2,
+                                ),
                                 itemCount: socialMediaList.length,
                                 itemBuilder: (context, index) {
-                                  return _SocialMediaCard(
-                                    socialMediaList[index],
-                                  );
+                                  return _SocialMediaCard(socialMediaList[index]);
                                 },
                               ),
                             ],
@@ -383,195 +429,94 @@ class _ContactContent extends StatelessWidget {
                         ),
                       ],
                     );
+                  }
+                },
+              );
             },
           ),
           SizedBox(height: isMobile ? 40 : 60),
 
           // Harita veya Ekstra Bilgi Bölümü
-          Container(
-            padding: EdgeInsets.all(isMobile ? 20 : 40),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A2332),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 1,
-              ),
-            ),
-            child: isMobile
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobileLayout = constraints.maxWidth < 1024;
+              
+              return Container(
+                padding: EdgeInsets.all(isMobile ? 20 : 40),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    width: 1,
+                  ),
+                ),
+                child: isMobileLayout
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF2196F3,
-                              ).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.message,
-                              color: Color(0xFF2196F3),
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          const Text(
-                            'Mesaj Gönderin',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final contactData = await _firestoreService.getContactSettings();
-                            final email = contactData['email'] ?? '';
-                            if (email.isEmpty) return;
-                            
-                            final Uri emailUri = Uri(
-                              scheme: 'mailto',
-                              path: email,
-                              query: 'subject=İletişim Formu',
-                            );
-                            if (await canLaunchUrl(emailUri)) {
-                              await launchUrl(emailUri);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2196F3),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
+                          Row(
                             children: [
-                              Icon(Icons.email, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'E-posta Gönder',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                padding: EdgeInsets.all(isMobile ? 10 : 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2196F3).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.message,
+                                  color: const Color(0xFF2196F3),
+                                  size: isMobile ? 24 : 28,
+                                ),
+                              ),
+                              SizedBox(width: isMobile ? 12 : 16),
+                              Flexible(
+                                child: Text(
+                                  'Mesaj Gönderin',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: SizeHelper.clampFontSize(
+                                      screenWidth,
+                                      18,
+                                      20,
+                                      24,
+                                    ),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: SizeHelper.safeInfinity(context, isWidth: true),
-                        height: SizeHelper.safeSize(value: 200, min: 150, max: 400, context: 'Map height'),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0A1929),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            width: 1,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: kIsWeb
-                              ? const _GoogleMapWidget()
-                              : const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.map,
-                                        color: Colors.white54,
-                                        size: 48,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'Harita',
-                                        style: TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFF2196F3,
-                                    ).withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.message,
-                                    color: Color(0xFF2196F3),
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  'Mesaj Gönderin',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: SizeHelper.safeFontSize(context, preferredSize: 24),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
-                                height: 1.6,
+                          SizedBox(height: isMobile ? 16 : 20),
+                          Text(
+                            'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: SizeHelper.clampFontSize(
+                                screenWidth,
+                                14,
+                                16,
+                                18,
                               ),
+                              height: 1.6,
                             ),
-                            const SizedBox(height: 30),
-                            ElevatedButton(
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: isMobile ? 16 : 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
                               onPressed: () async {
+                                final contactData = await _firestoreService.getContactSettings();
+                                final email = contactData['email'] ?? '';
+                                if (email.isEmpty) return;
+                                
                                 final Uri emailUri = Uri(
                                   scheme: 'mailto',
-                                  path: 'info@bmt.edu.tr',
+                                  path: email,
                                   query: 'subject=İletişim Formu',
                                 );
                                 if (await canLaunchUrl(emailUri)) {
@@ -581,72 +526,224 @@ class _ContactContent extends StatelessWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2196F3),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 24 : 32,
+                                  vertical: isMobile ? 14 : 16,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: const Row(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.email, size: 20),
-                                  SizedBox(width: 8),
+                                  Icon(Icons.email, size: isMobile ? 18 : 20),
+                                  SizedBox(width: isMobile ? 6 : 8),
                                   Text(
                                     'E-posta Gönder',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: SizeHelper.clampFontSize(
+                                        screenWidth,
+                                        14,
+                                        16,
+                                        18,
+                                      ),
                                       fontWeight: FontWeight.bold,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 40),
-                      Container(
-                        width: SizeHelper.safeSize(value: 300, min: 200, max: 500, context: 'Map width'),
-                        height: SizeHelper.safeSize(value: 200, min: 150, max: 400, context: 'Map height'),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0A1929),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            width: 1,
                           ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: kIsWeb
-                              ? const _GoogleMapWidget()
-                              : const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.map,
-                                        color: Colors.white54,
-                                        size: 48,
+                          SizedBox(height: isMobile ? 16 : 20),
+                          Container(
+                            width: double.infinity,
+                            height: isMobile ? 200 : 250,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A1929),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: kIsWeb
+                                  ? const _GoogleMapWidget()
+                                  : const Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.map,
+                                            color: Colors.white54,
+                                            size: 48,
+                                          ),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Harita',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'Harita',
-                                        style: TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 16,
+                                    ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2196F3).withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.message,
+                                        color: Color(0xFF2196F3),
+                                        size: 28,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      'Mesaj Gönderin',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: SizeHelper.clampFontSize(
+                                          screenWidth,
+                                          22,
+                                          24,
+                                          28,
                                         ),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Sorularınız, önerileriniz veya iş birliği teklifleriniz için bizimle iletişime geçebilirsiniz. Size en kısa sürede dönüş yapacağız.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: SizeHelper.clampFontSize(
+                                      screenWidth,
+                                      14,
+                                      16,
+                                      18,
+                                    ),
+                                    height: 1.6,
+                                  ),
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 30),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    final contactData = await _firestoreService.getContactSettings();
+                                    final email = contactData['email'] ?? '';
+                                    if (email.isEmpty) return;
+                                    
+                                    final Uri emailUri = Uri(
+                                      scheme: 'mailto',
+                                      path: email,
+                                      query: 'subject=İletişim Formu',
+                                    );
+                                    if (await canLaunchUrl(emailUri)) {
+                                      await launchUrl(emailUri);
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2196F3),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 32,
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.email, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'E-posta Gönder',
+                                        style: TextStyle(
+                                          fontSize: SizeHelper.clampFontSize(
+                                            screenWidth,
+                                            14,
+                                            16,
+                                            18,
+                                          ),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
-                        ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: isMobile ? 20 : 40),
+                          Container(
+                            width: screenWidth > 1400 ? 400 : 300,
+                            height: 250,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A1929),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: kIsWeb
+                                  ? const _GoogleMapWidget()
+                                  : const Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.map,
+                                            color: Colors.white54,
+                                            size: 48,
+                                          ),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Harita',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+              );
+            },
           ),
         ],
       ),
@@ -698,7 +795,7 @@ class _SocialMediaCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 16 : 18),
               decoration: BoxDecoration(
                 color: socialMedia.color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
@@ -706,17 +803,24 @@ class _SocialMediaCard extends StatelessWidget {
               child: Icon(
                 socialMedia.icon,
                 color: socialMedia.color,
-                size: SizeHelper.safeSize(value: 48, min: 32, max: 64, context: 'Social media icon size'),
+                size: SizeHelper.isMobile(context) ? 32 : (SizeHelper.isTablet(context) ? 36 : 40),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: SizeHelper.isMobile(context) ? 12 : 14),
             Text(
               socialMedia.name,
               style: TextStyle(
                 color: hasUrl ? Colors.white : Colors.white54, // URL boşsa daha soluk
-                fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
+                fontSize: SizeHelper.clampFontSize(
+                  MediaQuery.of(context).size.width,
+                  12,
+                  14,
+                  16,
+                ),
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             if (!hasUrl) // URL boşsa bilgi metni göster
               Padding(
@@ -774,14 +878,18 @@ class _ContactInfoCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 10 : 12),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(
+                icon,
+                color: color,
+                size: SizeHelper.isMobile(context) ? 20 : 22,
+              ),
             ),
-            const SizedBox(width: 20),
+            SizedBox(width: SizeHelper.isMobile(context) ? 16 : 18),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,18 +898,30 @@ class _ContactInfoCard extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
+                      fontSize: SizeHelper.clampFontSize(
+                        MediaQuery.of(context).size.width,
+                        14,
+                        16,
+                        18,
+                      ),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: SizeHelper.isMobile(context) ? 6 : 8),
                   Text(
                     content,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 14,
-                      height: 1.5,
+                      fontSize: SizeHelper.clampFontSize(
+                        MediaQuery.of(context).size.width,
+                        11,
+                        13,
+                        15,
+                      ),
+                      height: 1.4,
                     ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

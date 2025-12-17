@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Events klasörü - herkes okuyabilir ve yazabilir (test için)
+    match /events/{eventId}/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Team members klasörü - herkes okuyabilir ve yazabilir (test için)
+    match /team_members/{memberId}/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Announcements klasörü - herkes okuyabilir ve yazabilir (test için)
+    match /announcements/{announcementId}/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Sponsors klasörü - herkes okuyabilir ve yazabilir (test için)
+    match /sponsors/{sponsorId}/{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Diğer tüm dosyalar için varsayılan kural (test için - herkes yazabilir)
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

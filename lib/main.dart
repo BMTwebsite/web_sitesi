@@ -18,6 +18,7 @@ import 'pages/admin_verify_page.dart';
 import 'pages/admin_panel_page.dart';
 import 'providers/auth_provider.dart';
 import 'providers/firestore_provider.dart';
+import 'utils/custom_page_route.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,10 +56,11 @@ void main() async {
         appId: Secrets.firebaseAppId,
       ),
     ).timeout(
-      const Duration(seconds: 15),
+      const Duration(seconds: 10),
       onTimeout: () {
-        print('⏱️ Firebase başlatma timeout oldu');
-        throw 'Firebase başlatma zaman aşımına uğradı (15 saniye)';
+        print('⏱️ Firebase başlatma timeout oldu (10 saniye)');
+        print('⚠️ İnternet bağlantınızı kontrol edin');
+        throw 'Firebase başlatma zaman aşımına uğradı. İnternet bağlantınızı kontrol edin.';
       },
     );
     firebaseInitialized = true;
@@ -145,13 +147,14 @@ class BMTApp extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Firebase başlatılamadı. Lütfen:\n\n'
-                    '1. İnternet bağlantınızı kontrol edin\n'
-                    '2. Tarayıcı konsolunu açın (F12) ve hataları kontrol edin\n'
-                    '3. lib/secrets.dart dosyasının doğru olduğundan emin olun\n'
-                    '4. Firebase projesinin aktif olduğundan emin olun\n\n'
-                    '${firebaseError != null ? 'Hata: $firebaseError\n\n' : ''}'
-                    '${kIsWeb ? 'Detaylı hata bilgisi için tarayıcı konsolunu (F12) kontrol edin.' : ''}',
+                    'Firebase başlatılamadı. Bu genellikle internet bağlantısı sorunundan kaynaklanır.\n\n'
+                    'Lütfen şunları kontrol edin:\n\n'
+                    '1. ✅ İnternet bağlantınızın aktif olduğundan emin olun\n'
+                    '2. ✅ VPN kullanıyorsanız kapatıp tekrar deneyin\n'
+                    '3. ✅ Tarayıcı konsolunu açın (F12) ve hataları kontrol edin\n'
+                    '4. ✅ Sayfayı yenileyin (F5)\n\n'
+                    '${firebaseError != null ? 'Hata Detayı:\n$firebaseError\n\n' : ''}'
+                    '${kIsWeb ? '💡 İpucu: Tarayıcı konsolunu (F12) açarak daha detaylı hata bilgisi görebilirsiniz.' : ''}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white70,
@@ -205,171 +208,215 @@ class BMTApp extends StatelessWidget {
           ),
           scaffoldBackgroundColor: const Color(0xFF0A1929),
         ),
+        // Tüm sayfaları tam ekran yap
+        builder: (context, child) {
+          if (!kIsWeb) {
+            return child ?? const SizedBox();
+          }
+          
+          try {
+            final mediaQuery = MediaQuery.of(context);
+            final screenWidth = mediaQuery.size.width;
+            final screenHeight = mediaQuery.size.height;
+            
+            // Tam ekran container
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                size: Size(screenWidth, screenHeight),
+                padding: EdgeInsets.zero,
+              ),
+              child: Container(
+                width: screenWidth,
+                height: screenHeight,
+                color: const Color(0xFF0A1929),
+                child: child ?? const SizedBox(),
+              ),
+            );
+          } catch (e) {
+            print('❌ Builder hatası: $e');
+            return child ?? const SizedBox();
+          }
+        },
         // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
         home: kIsWeb ? (_getHomeWidget() ?? const HomePage()) : const HomePage(),
-        routes: {
-        // '/' route'u kaldırıldı çünkü home property kullanılıyor
-        '/home': (context) => const HomePage(),
-        '/events': (context) => const EventsPage(),
-        '/announcements': (context) => const AnnouncementsPage(),
-        '/about': (context) => const AboutPage(),
-        '/team': (context) => const TeamPage(),
-        '/sponsor': (context) => const SponsorsPage(),
-        '/contact': (context) => const ContactPage(),
-        '/admin-login': (context) => const AdminLoginPage(),
-        '/admin-register': (context) => const AdminRegisterPage(),
-        '/admin-panel': (context) => const AdminPanelPage(),
-        '/admin-verify': (context) {
-          // Hash routing için query parametrelerini al
-          String? token;
+        onGenerateRoute: (settings) {
+          print('🔍 onGenerateRoute çağrıldı: ${settings.name}');
+          
+          // Web'de hash routing kontrolü
           if (kIsWeb) {
             try {
-              // ignore: avoid_web_libraries_in_flutter
-              final fullUrl = html.window.location.href;
               final hash = html.window.location.hash;
-              final search = html.window.location.search ?? '';
+              final fullUrl = html.window.location.href;
               
-              print('🔍 Full URL: $fullUrl');
-              print('🔍 Hash: $hash');
-              print('🔍 Search: $search');
+              print('🔍 onGenerateRoute - Hash: $hash');
+              print('🔍 onGenerateRoute - Full URL: $fullUrl');
               
-              // Yöntem 1: Hash'ten parse et (#/admin-verify?token=xxx)
-              if (hash.isNotEmpty) {
-                // Hash formatı: #/admin-verify?token=xxx
-                if (hash.contains('?')) {
-                  final hashParts = hash.split('?');
-                  if (hashParts.length > 1) {
-                    final queryString = hashParts[1];
-                    print('🔍 Query string from hash: $queryString');
-                    try {
-                      final queryUri = Uri.parse('?$queryString');
-                      token = queryUri.queryParameters['token'];
-                      print('🔍 Token from hash query: $token');
-                    } catch (e) {
-                      print('⚠️ Hash query parse hatası: $e');
-                    }
-                  }
-                }
+              // Eğer hash'te admin-verify varsa
+              if (hash.contains('/admin-verify') && hash.contains('token=')) {
+                print('✅ onGenerateRoute - Admin verify linki tespit edildi');
                 
-                // Alternatif: Hash içinde direkt token ara
-                if (token == null || token.isEmpty) {
-                  final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
-                  if (tokenMatch != null) {
-                    token = Uri.decodeComponent(tokenMatch.group(1)!);
-                    print('🔍 Token from hash regex: $token');
-                  }
-                }
-              }
-              
-              // Yöntem 2: Search'ten parse et (?token=xxx)
-              if ((token == null || token.isEmpty) && search.isNotEmpty) {
-                try {
-                  final searchUri = Uri.parse(search);
-                  token = searchUri.queryParameters['token'];
-                  print('🔍 Token from search: $token');
-                } catch (e) {
-                  print('⚠️ Search parse hatası: $e');
-                }
-              }
-              
-              // Yöntem 3: Full URL'den parse et
-              if (token == null || token.isEmpty) {
-                try {
-                  final fullUri = Uri.parse(fullUrl);
-                  token = fullUri.queryParameters['token'];
-                  print('🔍 Token from full URL: $token');
+                // Token'ı parse et
+                String? token;
+                final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+                if (tokenMatch != null && tokenMatch.group(1) != null) {
+                  token = Uri.decodeComponent(tokenMatch.group(1)!);
+                  print('✅ onGenerateRoute - Token bulundu: $token');
                   
-                  // Hash fragment'ten de dene
-                  if ((token == null || token.isEmpty) && fullUri.hasFragment) {
-                    final fragment = fullUri.fragment;
-                    if (fragment.isNotEmpty && fragment.contains('token=')) {
-                      final fragmentParts = fragment.split('token=');
-                      if (fragmentParts.length > 1) {
-                        final tokenPart = fragmentParts[1].split('&')[0].split('#')[0];
-                        if (tokenPart.isNotEmpty) {
-                          token = Uri.decodeComponent(tokenPart);
-                          print('🔍 Token from fragment: $token');
+                  return CustomPageRoute(
+                    settings: settings,
+                    child: AdminVerifyPage(token: token),
+                  );
+                }
+              }
+            } catch (e) {
+              print('⚠️ onGenerateRoute hash kontrolü hatası: $e');
+            }
+          }
+          
+          // Handle /verify?token=xxx route
+          if (settings.name == '/verify') {
+            final uri = Uri.parse(
+              settings.name! + (settings.arguments as String? ?? ''),
+            );
+            final token = uri.queryParameters['token'];
+            return CustomPageRoute(
+              settings: settings,
+              child: AdminVerifyPage(token: token),
+            );
+          }
+          
+          // Normal route'lar için custom transition kullan
+          Widget? page;
+          switch (settings.name) {
+            case '/home':
+            case '/':
+              page = const HomePage();
+              break;
+            case '/events':
+              page = const EventsPage();
+              break;
+            case '/announcements':
+              page = const AnnouncementsPage();
+              break;
+            case '/about':
+              page = const AboutPage();
+              break;
+            case '/team':
+              page = const TeamPage();
+              break;
+            case '/sponsor':
+              page = const SponsorsPage();
+              break;
+            case '/contact':
+              page = const ContactPage();
+              break;
+            case '/admin-login':
+              page = const AdminLoginPage();
+              break;
+            case '/admin-register':
+              page = const AdminRegisterPage();
+              break;
+            case '/admin-panel':
+              page = const AdminPanelPage();
+              break;
+            case '/admin-verify':
+              // Hash routing için query parametrelerini al
+              String? token;
+              if (kIsWeb) {
+                try {
+                  final fullUrl = html.window.location.href;
+                  final hash = html.window.location.hash;
+                  final search = html.window.location.search ?? '';
+                  
+                  // Yöntem 1: Hash'ten parse et
+                  if (hash.isNotEmpty) {
+                    if (hash.contains('?')) {
+                      final hashParts = hash.split('?');
+                      if (hashParts.length > 1) {
+                        try {
+                          final queryUri = Uri.parse('?${hashParts[1]}');
+                          token = queryUri.queryParameters['token'];
+                        } catch (e) {
+                          print('⚠️ Hash query parse hatası: $e');
                         }
                       }
                     }
+                    
+                    if (token == null || token.isEmpty) {
+                      final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
+                      if (tokenMatch != null) {
+                        token = Uri.decodeComponent(tokenMatch.group(1)!);
+                      }
+                    }
                   }
-                } catch (e) {
-                  print('⚠️ Full URL parse hatası: $e');
+                  
+                  // Yöntem 2: Search'ten parse et
+                  if ((token == null || token.isEmpty) && search.isNotEmpty) {
+                    try {
+                      final searchUri = Uri.parse(search);
+                      token = searchUri.queryParameters['token'];
+                    } catch (e) {
+                      print('⚠️ Search parse hatası: $e');
+                    }
+                  }
+                  
+                  // Yöntem 3: Full URL'den parse et
+                  if (token == null || token.isEmpty) {
+                    try {
+                      final fullUri = Uri.parse(fullUrl);
+                      token = fullUri.queryParameters['token'];
+                      
+                      if ((token == null || token.isEmpty) && fullUri.hasFragment) {
+                        final fragment = fullUri.fragment;
+                        if (fragment.isNotEmpty && fragment.contains('token=')) {
+                          final fragmentParts = fragment.split('token=');
+                          if (fragmentParts.length > 1) {
+                            final tokenPart = fragmentParts[1].split('&')[0].split('#')[0];
+                            if (tokenPart.isNotEmpty) {
+                              token = Uri.decodeComponent(tokenPart);
+                            }
+                          }
+                        }
+                      }
+                    } catch (e) {
+                      print('⚠️ Full URL parse hatası: $e');
+                    }
+                  }
+                  
+                  // Yöntem 4: Uri.base'den dene
+                  if (token == null || token.isEmpty) {
+                    token = Uri.base.queryParameters['token'];
+                  }
+                } catch (e, stackTrace) {
+                  print('❌ Query parameter parse hatası: $e');
+                  print('📚 Stack trace: $stackTrace');
+                  try {
+                    token = Uri.base.queryParameters['token'];
+                  } catch (e2) {
+                    print('❌ Uri.base parse hatası: $e2');
+                  }
                 }
+              } else {
+                token = Uri.base.queryParameters['token'];
               }
               
-              // Yöntem 4: Uri.base'den dene (fallback)
+              print('✅ Final token: $token');
               if (token == null || token.isEmpty) {
-                final baseUri = Uri.base;
-                token = baseUri.queryParameters['token'];
-                print('🔍 Token from Uri.base: $token');
+                print('⚠️ Token bulunamadı! URL formatını kontrol edin.');
               }
-            } catch (e, stackTrace) {
-              print('❌ Query parameter parse hatası: $e');
-              print('📚 Stack trace: $stackTrace');
-              // Son çare: Uri.base'den dene
-              try {
-                token = Uri.base.queryParameters['token'];
-              } catch (e2) {
-                print('❌ Uri.base parse hatası: $e2');
-              }
-            }
-          } else {
-            token = Uri.base.queryParameters['token'];
+              page = AdminVerifyPage(token: token);
+              break;
           }
           
-          print('✅ Final token: $token');
-          if (token == null || token.isEmpty) {
-            print('⚠️ Token bulunamadı! URL formatını kontrol edin.');
+          if (page != null) {
+            return CustomPageRoute(
+              settings: settings,
+              child: page,
+            );
           }
-          return AdminVerifyPage(token: token);
+          
+          return null;
         },
-      },
-      onGenerateRoute: (settings) {
-        print('🔍 onGenerateRoute çağrıldı: ${settings.name}');
-        
-        // Web'de hash routing kontrolü
-        if (kIsWeb) {
-          try {
-            final hash = html.window.location.hash;
-            final fullUrl = html.window.location.href;
-            
-            print('🔍 onGenerateRoute - Hash: $hash');
-            print('🔍 onGenerateRoute - Full URL: $fullUrl');
-            
-            // Eğer hash'te admin-verify varsa
-            if (hash.contains('/admin-verify') && hash.contains('token=')) {
-              print('✅ onGenerateRoute - Admin verify linki tespit edildi');
-              
-              // Token'ı parse et
-              String? token;
-              final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
-              if (tokenMatch != null && tokenMatch.group(1) != null) {
-                token = Uri.decodeComponent(tokenMatch.group(1)!);
-                print('✅ onGenerateRoute - Token bulundu: $token');
-                
-                return MaterialPageRoute(
-                  builder: (context) => AdminVerifyPage(token: token),
-                );
-              }
-            }
-          } catch (e) {
-            print('⚠️ onGenerateRoute hash kontrolü hatası: $e');
-          }
-        }
-        
-        // Handle /verify?token=xxx route
-        if (settings.name == '/verify') {
-          final uri = Uri.parse(
-            settings.name! + (settings.arguments as String? ?? ''),
-          );
-          final token = uri.queryParameters['token'];
-          return MaterialPageRoute(
-            builder: (context) => AdminVerifyPage(token: token),
-          );
-        }
-        return null;
-      },
       ),
     );
   }

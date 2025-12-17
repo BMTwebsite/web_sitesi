@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'dart:html' as html;
+import 'dart:ui_web' as ui_web;
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/image_viewer_dialog.dart';
 import '../services/firestore_service.dart';
 import '../utils/size_helper.dart';
 
@@ -11,14 +17,25 @@ class EventsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Header(currentRoute: '/events'),
-            _EventsContent(),
-            const Footer(),
-          ],
-        ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            floating: false,
+            delegate: HeaderSliverDelegate(
+              child: const Header(currentRoute: '/events'),
+              context: context,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _EventsContent(),
+                const Footer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -26,6 +43,69 @@ class EventsPage extends StatelessWidget {
 
 class _EventsContent extends StatelessWidget {
   final _firestoreService = FirestoreService();
+
+  // AnnouncementData'yı EventData'ya dönüştür
+  EventData _announcementToEvent(AnnouncementData announcement) {
+    return EventData(
+      id: announcement.id,
+      type: announcement.type,
+      title: announcement.eventName,
+      date: announcement.date,
+      time: 'Belirtilmemiş', // AnnouncementData'da time yok
+      location: announcement.address,
+      participants: 0, // AnnouncementData'da participants yok
+      colorHex: announcement.colorHex,
+      images: announcement.posterUrl.isNotEmpty ? [announcement.posterUrl] : [],
+    );
+  }
+
+  // İki stream'i birleştir
+  Stream<List<EventData>> _getCombinedEvents() {
+    final eventsStream = _firestoreService.getEvents();
+    final announcementsStream = _firestoreService.getAnnouncementsByType('etkinlik');
+
+    // İki stream'i birleştirmek için bir controller kullan
+    final controller = StreamController<List<EventData>>();
+    List<EventData> events = [];
+    List<AnnouncementData> announcements = [];
+
+    void emitCombined() {
+      // AnnouncementData'ları EventData'ya dönüştür
+      final eventAnnouncements = announcements.map(_announcementToEvent).toList();
+
+      // İki listeyi birleştir
+      final combined = <EventData>[...events, ...eventAnnouncements];
+
+      // Tarihe göre sırala (en yakın tarih önce)
+      combined.sort((a, b) => a.date.compareTo(b.date));
+
+      controller.add(combined);
+    }
+
+    final eventsSubscription = eventsStream.listen(
+      (data) {
+        events = data;
+        emitCombined();
+      },
+      onError: (error) => controller.addError(error),
+    );
+
+    final announcementsSubscription = announcementsStream.listen(
+      (data) {
+        announcements = data;
+        emitCombined();
+      },
+      onError: (error) => controller.addError(error),
+    );
+
+    // Controller kapandığında subscription'ları iptal et
+    controller.onCancel = () {
+      eventsSubscription.cancel();
+      announcementsSubscription.cancel();
+    };
+
+    return controller.stream;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,10 +122,9 @@ class _EventsContent extends StatelessWidget {
           stops: const [0.0, 0.5, 1.0],
         ),
       ),
-      padding: SizeHelper.safePadding(
-        context: context,
-        horizontal: 60,
-        vertical: 60,
+      padding: EdgeInsets.symmetric(
+        horizontal: SizeHelper.isMobile(context) ? 16 : (SizeHelper.isTablet(context) ? 32 : 60),
+        vertical: SizeHelper.isMobile(context) ? 40 : (SizeHelper.isTablet(context) ? 50 : 60),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,21 +163,23 @@ class _EventsContent extends StatelessWidget {
             'Etkinlik Takvimi',
             style: TextStyle(
               color: Colors.white,
-              fontSize: SizeHelper.safeFontSize(context, preferredSize: 48),
+              fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 28, 38, 48),
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: SizeHelper.isMobile(context) ? 12 : 16),
           Text(
             'Yaklaşan etkinliklerimize göz atın ve teknoloji dünyasında bir adım öne geçin',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: SizeHelper.safeFontSize(context, preferredSize: 18),
+              fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 14, 16, 18),
             ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 40),
           StreamBuilder<List<EventData>>(
-            stream: _firestoreService.getEvents(),
+            stream: _getCombinedEvents(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -110,43 +191,90 @@ class _EventsContent extends StatelessWidget {
               }
 
               if (snapshot.hasError) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isMobile = SizeHelper.isMobile(context);
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Text(
-                      'Etkinlikler yüklenirken bir hata oluştu: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
+                    padding: EdgeInsets.all(isMobile ? 20 : 40),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: SizeHelper.clampFontSize(screenWidth, 32, 40, 48),
+                        ),
+                        SizedBox(height: isMobile ? 12 : 16),
+                        Text(
+                          'Etkinlikler yüklenirken bir hata oluştu',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: isMobile ? 8 : 12),
+                        Text(
+                          snapshot.error.toString(),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 11, 13, 15),
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
                 );
               }
 
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Text(
-                      'Henüz etkinlik eklenmemiş.',
-                      style: TextStyle(color: Colors.white70, fontSize: 18),
-                    ),
-                  ),
+                return const EmptyState(
+                  message: 'Henüz etkinlik eklenmemiş.',
+                  icon: Icons.event,
                 );
               }
 
               final events = snapshot.data!;
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: SizeHelper.safeCrossAxisCount(context, preferredCount: 4),
-                  crossAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-                  mainAxisSpacing: SizeHelper.safeSize(value: 20, min: 10, max: 40, context: 'Grid spacing'),
-                  childAspectRatio: SizeHelper.safeSize(value: 0.75, min: 0.5, max: 1.0, context: 'Grid aspect ratio'),
-                ),
-                itemCount: events.length,
-                itemBuilder: (context, index) {
-                  return _EventCard(events[index]);
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  // Responsive grid: mobile 1, tablet 2, desktop 3-4
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  int crossAxisCount;
+                  double aspectRatio;
+                  
+                  if (screenWidth < 600) {
+                    crossAxisCount = 1;
+                    aspectRatio = 0.85; // Mobil: daha uzun kartlar
+                  } else if (screenWidth < 1024) {
+                    crossAxisCount = 2;
+                    aspectRatio = 0.75; // Tablet: 2 sütun
+                  } else {
+                    crossAxisCount = screenWidth > 1400 ? 4 : 3;
+                    aspectRatio = 0.7; // Desktop: 3-4 sütun
+                  }
+                  
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: screenWidth < 600 ? 12 : (screenWidth < 1024 ? 16 : 20),
+                      mainAxisSpacing: screenWidth < 600 ? 12 : (screenWidth < 1024 ? 16 : 20),
+                      childAspectRatio: aspectRatio,
+                    ),
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      return _EventCard(events[index]);
+                    },
+                  );
                 },
               );
             },
@@ -162,6 +290,78 @@ class _EventCard extends StatelessWidget {
 
   const _EventCard(this.event);
 
+  Widget _buildPosterImage(String imageUrl, double screenWidth, double imageSize, Color fallbackColor, BuildContext context) {
+    if (kIsWeb) {
+      // Web için HTML img elementi kullan (CORS sorununu çözer)
+      final imageId = 'event_img_${event.id ?? DateTime.now().millisecondsSinceEpoch}';
+      
+      // HTML img elementi oluştur
+      final imgElement = html.ImageElement()
+        ..src = imageUrl
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.objectFit = 'contain'
+        ..style.cursor = 'pointer'
+        ..onError.listen((_) {
+          print('❌ Event Page - HTML img yükleme hatası: $imageUrl');
+        })
+        ..onLoad.listen((_) {
+          print('✅ Event Page - HTML img yüklendi: $imageUrl');
+        });
+      
+      // Platform view registry'ye kaydet
+      ui_web.platformViewRegistry.registerViewFactory(
+        imageId,
+        (int viewId) => imgElement,
+      );
+      
+      return GestureDetector(
+        onTap: () {
+          ImageViewerDialog.show(context, imageUrl, title: event.title);
+        },
+        child: HtmlElementView(viewType: imageId),
+      );
+    } else {
+      // Mobile için normal Image.network kullan
+      return GestureDetector(
+        onTap: () {
+          ImageViewerDialog.show(context, imageUrl, title: event.title);
+        },
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: const Color(0xFF1A2332),
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+                color: fallbackColor,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: fallbackColor.withOpacity(0.2),
+            child: Center(
+              child: Icon(
+                Icons.image_not_supported,
+                color: Colors.white54,
+                size: SizeHelper.clampFontSize(screenWidth, 32, 40, 48),
+              ),
+            ),
+          );
+        },
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -176,13 +376,57 @@ class _EventCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Type badge at top
+          // Poster image
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(14),
+              topRight: Radius.circular(14),
+            ),
+            child: Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                double posterHeight;
+                if (screenWidth < 600) {
+                  posterHeight = 140; // Mobil
+                } else if (screenWidth < 1024) {
+                  posterHeight = 160; // Tablet
+                } else {
+                  posterHeight = 180; // Desktop
+                }
+
+                final posterUrl = event.images.isNotEmpty ? event.images.first : '';
+
+                return Container(
+                  height: posterHeight,
+                  width: double.infinity,
+                  constraints: BoxConstraints(
+                    maxHeight: posterHeight,
+                    minHeight: 100,
+                  ),
+                  color: const Color(0xFF1A2332),
+                  child: posterUrl.isNotEmpty
+                      ? _buildPosterImage(posterUrl, screenWidth, posterHeight, event.color, context)
+                      : Container(
+                          color: event.color.withOpacity(0.2),
+                          child: Center(
+                            child: Icon(
+                              Icons.event,
+                              color: Colors.white54,
+                              size: SizeHelper.clampFontSize(screenWidth, 32, 40, 48),
+                            ),
+                          ),
+                        ),
+                );
+              },
+            ),
+          ),
+          // Type badge
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
+              padding: EdgeInsets.symmetric(
+                horizontal: SizeHelper.isMobile(context) ? 10 : 12,
+                vertical: SizeHelper.isMobile(context) ? 5 : 6,
               ),
               decoration: BoxDecoration(
                 color: event.color.withOpacity(0.2),
@@ -194,15 +438,24 @@ class _EventCard extends StatelessWidget {
                   Icon(
                     Icons.calendar_today,
                     color: event.color,
-                    size: 16,
+                    size: SizeHelper.isMobile(context) ? 14 : 16,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    event.type,
-                    style: TextStyle(
-                      color: event.color,
-                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 12),
-                      fontWeight: FontWeight.bold,
+                  SizedBox(width: SizeHelper.isMobile(context) ? 5 : 6),
+                  Flexible(
+                    child: Text(
+                      event.type,
+                      style: TextStyle(
+                        color: event.color,
+                        fontSize: SizeHelper.clampFontSize(
+                          MediaQuery.of(context).size.width,
+                          10,
+                          12,
+                          14,
+                        ),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -210,52 +463,80 @@ class _EventCard extends StatelessWidget {
             ),
           ),
           // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: SizeHelper.safeFontSize(context, preferredSize: 16),
-                      fontWeight: FontWeight.bold,
-                      height: 1.3,
+          Padding(
+            padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  event.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: SizeHelper.clampFontSize(
+                      MediaQuery.of(context).size.width,
+                      14,
+                      16,
+                      18,
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
                   ),
-                  const SizedBox(height: 16),
-                  _EventInfo(
-                    icon: Icons.calendar_today,
-                    text: event.date,
-                  ),
-                  const SizedBox(height: 8),
-                  _EventInfo(
-                    icon: Icons.access_time,
-                    text: event.time,
-                  ),
-                  const SizedBox(height: 8),
-                  _EventInfo(
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: SizeHelper.isMobile(context) ? 12 : 16),
+                _EventInfo(
+                  icon: Icons.calendar_today,
+                  text: event.date,
+                ),
+                SizedBox(height: SizeHelper.isMobile(context) ? 6 : 8),
+                _EventInfo(
+                  icon: Icons.access_time,
+                  text: event.time,
+                ),
+                SizedBox(height: SizeHelper.isMobile(context) ? 6 : 8),
+                GestureDetector(
+                  onTap: () {
+                    if (event.locationCoordinates != null) {
+                      final lat = event.locationCoordinates!['latitude'];
+                      final lng = event.locationCoordinates!['longitude'];
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps?q=$lat,$lng',
+                      );
+                      html.window.open(uri.toString(), '_blank');
+                    } else if (event.location.isNotEmpty) {
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(event.location)}',
+                      );
+                      html.window.open(uri.toString(), '_blank');
+                    }
+                  },
+                  child: _EventInfo(
                     icon: Icons.location_on,
                     text: event.location,
                   ),
-                  const Spacer(),
-                  _EventInfo(
-                    icon: Icons.people,
-                    text: '${event.participants} Katılımcı',
-                  ),
-                  const SizedBox(height: 16),
+                ),
+                SizedBox(height: SizeHelper.isMobile(context) ? 8 : 10),
+                _EventInfo(
+                  icon: Icons.people,
+                  text: '${event.participants} Katılımcı',
+                ),
+                if (event.registrationFormLink != null && event.registrationFormLink!.isNotEmpty) ...[
+                  SizedBox(height: SizeHelper.isMobile(context) ? 12 : 16),
                   SizedBox(
-                    width: SizeHelper.safeInfinity(context, isWidth: true),
+                    width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        final uri = Uri.parse(event.registrationFormLink!);
+                        html.window.open(uri.toString(), '_blank');
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: event.color,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          vertical: SizeHelper.isMobile(context) ? 10 : 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -263,15 +544,21 @@ class _EventCard extends StatelessWidget {
                       child: Text(
                         'Kayıt Ol',
                         style: TextStyle(
-                          fontSize: SizeHelper.safeFontSize(context, preferredSize: 14),
+                          fontSize: SizeHelper.clampFontSize(
+                            MediaQuery.of(context).size.width,
+                            12,
+                            14,
+                            16,
+                          ),
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -290,15 +577,26 @@ class _EventInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 16),
-        const SizedBox(width: 8),
+        Icon(
+          icon,
+          color: Colors.white70,
+          size: SizeHelper.isMobile(context) ? 14 : 16,
+        ),
+        SizedBox(width: SizeHelper.isMobile(context) ? 6 : 8),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
               color: Colors.white70,
-              fontSize: SizeHelper.safeFontSize(context, preferredSize: 13),
+              fontSize: SizeHelper.clampFontSize(
+                MediaQuery.of(context).size.width,
+                11,
+                13,
+                15,
+              ),
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

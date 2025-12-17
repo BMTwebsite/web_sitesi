@@ -4,12 +4,23 @@ import 'size_exception.dart';
 /// Boyutlarla ilgili güvenli işlemler için helper class
 class SizeHelper {
   /// Minimum ve maksimum değerler arasında güvenli bir boyut döndürür
+  /// Eğer context verilirse, scale faktörü uygulanır
   static double safeSize({
     required double value,
     double min = 0.0,
     double? max,
     String? context,
+    BuildContext? buildContext,
   }) {
+    // Eğer buildContext verilmişse scale faktörü uygula
+    if (buildContext != null && context != null) {
+      try {
+        final scaleFactor = getScaleFactor(buildContext);
+        value = value * scaleFactor;
+      } catch (e) {
+        debugPrint('⚠️ SafeSize scale error: $e');
+      }
+    }
     try {
       if (value < min) {
         throw InvalidSizeException(
@@ -93,6 +104,7 @@ class SizeHelper {
   }
 
   /// Padding değerini güvenli bir şekilde döndürür
+  /// Referans ekran genişliği: 1920px
   static EdgeInsets safePadding({
     required BuildContext context,
     double? horizontal,
@@ -100,38 +112,17 @@ class SizeHelper {
     double? all,
   }) {
     try {
-      final screenWidth = safeWidth(context);
-      final screenHeight = safeHeight(context);
-
-      // Mobil cihazlar için daha küçük padding
-      final isMobile = screenWidth < 768;
-      final isTablet = screenWidth >= 768 && screenWidth < 1024;
+      final scaleFactor = getScaleFactor(context);
 
       double hPadding;
       double vPadding;
 
       if (all != null) {
-        hPadding = safeSize(
-          value: isMobile ? all * 0.5 : (isTablet ? all * 0.75 : all),
-          max: screenWidth * 0.1,
-          context: 'Padding horizontal',
-        );
-        vPadding = safeSize(
-          value: isMobile ? all * 0.5 : (isTablet ? all * 0.75 : all),
-          max: screenHeight * 0.1,
-          context: 'Padding vertical',
-        );
+        hPadding = all * scaleFactor;
+        vPadding = all * scaleFactor;
       } else {
-        hPadding = safeSize(
-          value: horizontal ?? (isMobile ? 20.0 : 60.0),
-          max: screenWidth * 0.1,
-          context: 'Padding horizontal',
-        );
-        vPadding = safeSize(
-          value: vertical ?? (isMobile ? 40.0 : 60.0),
-          max: screenHeight * 0.1,
-          context: 'Padding vertical',
-        );
+        hPadding = (horizontal ?? 60.0) * scaleFactor;
+        vPadding = (vertical ?? 60.0) * scaleFactor;
       }
 
       return EdgeInsets.symmetric(
@@ -181,17 +172,24 @@ class SizeHelper {
   }
 
   /// Font boyutunu güvenli bir şekilde döndürür
+  /// Referans ekran genişliği: 1920px
+  /// Tüm ekranlar bu referansa göre scale edilir
   static double safeFontSize(BuildContext context, {required double preferredSize}) {
     try {
       final screenWidth = safeWidth(context);
       
-      // Responsive font boyutu
-      double fontSize = preferredSize;
-      if (screenWidth < 768) {
-        fontSize = preferredSize * 0.7; // Mobil için küçült
-      } else if (screenWidth < 1024) {
-        fontSize = preferredSize * 0.85; // Tablet için biraz küçült
-      }
+      // Referans ekran genişliği (1920px)
+      const double referenceWidth = 1920.0;
+      
+      // Scale faktörü hesapla (referans ekrana göre)
+      double scaleFactor = screenWidth / referenceWidth;
+      
+      // Minimum ve maksimum scale limitleri
+      if (scaleFactor < 0.4) scaleFactor = 0.4; // Çok küçük ekranlar için minimum
+      if (scaleFactor > 1.2) scaleFactor = 1.2; // Çok büyük ekranlar için maksimum
+      
+      // Font boyutunu scale et
+      double fontSize = preferredSize * scaleFactor;
 
       return safeSize(
         value: fontSize,
@@ -202,6 +200,24 @@ class SizeHelper {
     } catch (e) {
       debugPrint('⚠️ SafeFontSize Error: $e');
       return 16.0; // Varsayılan font boyutu
+    }
+  }
+  
+  /// Genel scale faktörü (referans: 1920px genişlik)
+  static double getScaleFactor(BuildContext context) {
+    try {
+      final screenWidth = safeWidth(context);
+      const double referenceWidth = 1920.0;
+      double scaleFactor = screenWidth / referenceWidth;
+      
+      // Minimum ve maksimum scale limitleri
+      if (scaleFactor < 0.4) scaleFactor = 0.4;
+      if (scaleFactor > 1.2) scaleFactor = 1.2;
+      
+      return scaleFactor;
+    } catch (e) {
+      debugPrint('⚠️ GetScaleFactor Error: $e');
+      return 1.0;
     }
   }
 
@@ -243,6 +259,7 @@ class SizeHelper {
   }
 
   /// Responsive grid crossAxisCount döndürür
+  /// mobile < 600: 1 sütun, tablet 600-1024: 2 sütun, desktop > 1024: 3-4 sütun
   static int safeCrossAxisCount(BuildContext context, {int? preferredCount}) {
     try {
       final screenWidth = safeWidth(context);
@@ -250,15 +267,14 @@ class SizeHelper {
 
       if (screenWidth < 600) {
         return 1; // Mobil: 1 sütun
-      } else if (screenWidth < 900) {
-        return 2; // Küçük tablet: 2 sütun
-      } else if (screenWidth < 1200) {
-        return 3; // Tablet: 3 sütun
+      } else if (screenWidth < 1024) {
+        return 2; // Tablet: 2 sütun
       } else {
+        // Desktop: 3-4 sütun (preferredCount'a göre)
         return safeSize(
           value: count.toDouble(),
-          min: 1,
-          max: 6,
+          min: 3,
+          max: 4,
           context: 'Cross axis count',
         ).toInt();
       }
@@ -282,34 +298,58 @@ class SizeHelper {
     }
   }
 
-  /// Mobil cihaz kontrolü
+  /// Mobil cihaz kontrolü (< 600px)
   static bool isMobile(BuildContext context) {
     try {
-      return safeWidth(context) < 768;
+      return safeWidth(context) < 600;
     } catch (e) {
       debugPrint('⚠️ IsMobile Error: $e');
       return false;
     }
   }
 
-  /// Tablet cihaz kontrolü
+  /// Tablet cihaz kontrolü (600-1024px)
   static bool isTablet(BuildContext context) {
     try {
       final width = safeWidth(context);
-      return width >= 768 && width < 1024;
+      return width >= 600 && width < 1024;
     } catch (e) {
       debugPrint('⚠️ IsTablet Error: $e');
       return false;
     }
   }
 
-  /// Desktop cihaz kontrolü
+  /// Desktop cihaz kontrolü (> 1024px)
   static bool isDesktop(BuildContext context) {
     try {
       return safeWidth(context) >= 1024;
     } catch (e) {
       debugPrint('⚠️ IsDesktop Error: $e');
       return true;
+    }
+  }
+
+  /// Clamp fonksiyonu ile responsive font boyutu hesaplar
+  /// min: mobil için minimum boyut (< 600)
+  /// preferred: tablet için tercih edilen boyut (600-1024)
+  /// max: desktop için maksimum boyut (> 1024)
+  static double clampFontSize(double screenWidth, double min, double preferred, double max) {
+    if (screenWidth < 600) {
+      // Mobil (< 600)
+      return min;
+    } else if (screenWidth < 1024) {
+      // Tablet (600-1024) - min ve preferred arasında interpolasyon
+      final ratio = (screenWidth - 600) / (1024 - 600);
+      return min + (preferred - min) * ratio;
+    } else {
+      // Desktop (> 1024) - preferred ve max arasında interpolasyon
+      if (screenWidth < 1440) {
+        final ratio = (screenWidth - 1024) / (1440 - 1024);
+        return preferred + (max - preferred) * ratio;
+      } else {
+        // Büyük desktop
+        return max;
+      }
     }
   }
 }
