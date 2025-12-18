@@ -111,7 +111,7 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
   const db = admin.firestore();
   
   // Site adını ve email adresini Firestore'dan al (spam önleme için)
-  let siteName = 'BMT Web Sitesi'; // Varsayılan değer
+  let siteName = 'Bilgisayar Mühendisliği Topluluğu'; // Varsayılan değer
   let siteEmail = null; // Site email adresi (varsa kullanılacak)
   try {
     const siteSettingsDoc = await db.collection('site_settings').doc('main').get();
@@ -243,7 +243,7 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     
     // Gönderen email adresini belirle
     let sendFromEmail = siteEmail || 'onay@bmt.edu.tr'; // Varsayılan email
-    let sendFromName = siteName;
+    let sendFromName = 'BMT-WEB'; // E-posta gönderen adı
     
     // Resend'i geçici olarak devre dışı bırak (verified domain gerekli)
     // Önce Resend'i dene (daha güvenilir)

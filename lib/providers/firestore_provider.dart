@@ -264,9 +264,6 @@ class FirestoreProvider with ChangeNotifier {
     return _firestoreService.getAnnouncements(limit: limit);
   }
 
-  Stream<List<AnnouncementData>> getAnnouncementsByType(String type) {
-    return _firestoreService.getAnnouncementsByType(type);
-  }
 
   Future<void> addAnnouncement(AnnouncementData announcement) async {
     try {
@@ -609,6 +606,22 @@ class FirestoreProvider with ChangeNotifier {
       await _firestoreService.addAboutSection(section);
       _setLoading(false);
       notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _setLoading(false);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<DocumentReference> addAboutSectionAndGetRef(AboutSectionData section) async {
+    try {
+      _setLoading(true);
+      _error = null;
+      final docRef = await _firestoreService.addAboutSectionAndGetRef(section);
+      _setLoading(false);
+      notifyListeners();
+      return docRef;
     } catch (e) {
       _error = e.toString();
       _setLoading(false);

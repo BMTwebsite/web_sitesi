@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/image_viewer_dialog.dart';
+import '../widgets/team_member_card.dart';
 import '../providers/firestore_provider.dart';
 import '../utils/size_helper.dart';
 
@@ -339,15 +336,15 @@ class _TeamSection extends StatelessWidget {
             
             if (screenWidth < 600) {
               crossAxisCount = 1;
-              aspectRatio = 0.7;
+              aspectRatio = 0.85;
               spacing = 16;
             } else if (screenWidth < 1024) {
               crossAxisCount = 2;
-              aspectRatio = 0.6;
+              aspectRatio = 0.75;
               spacing = 18;
             } else {
               crossAxisCount = screenWidth > 1400 ? 4 : 3;
-              aspectRatio = 0.6;
+              aspectRatio = 0.75;
               spacing = 20;
             }
             
@@ -363,8 +360,10 @@ class _TeamSection extends StatelessWidget {
               itemCount: members.length,
               itemBuilder: (context, index) {
                 final member = members[index];
-                print('🔄 GridView.builder - Card oluşturuluyor: ${member.name}, photoUrl: ${member.photoUrl?.substring(0, member.photoUrl!.length > 50 ? 50 : member.photoUrl!.length) ?? "YOK"}...');
-                return _TeamMemberCard(member: member);
+                return TeamMemberCard(
+                  member: member,
+                  isAdmin: false,
+                );
               },
             );
           },
@@ -450,15 +449,15 @@ class _UnassignedTeamMembersSection extends StatelessWidget {
 
                 if (screenWidth < 600) {
                   crossAxisCount = 1;
-                  aspectRatio = 0.7;
+                  aspectRatio = 0.85;
                   spacing = 16;
                 } else if (screenWidth < 1024) {
                   crossAxisCount = 2;
-                  aspectRatio = 0.6;
+                  aspectRatio = 0.75;
                   spacing = 18;
                 } else {
                   crossAxisCount = screenWidth > 1400 ? 4 : 3;
-                  aspectRatio = 0.6;
+                  aspectRatio = 0.75;
                   spacing = 20;
                 }
 
@@ -474,7 +473,10 @@ class _UnassignedTeamMembersSection extends StatelessWidget {
                   itemCount: members.length,
                   itemBuilder: (context, index) {
                     final member = members[index];
-                    return _TeamMemberCard(member: member);
+                    return TeamMemberCard(
+                      member: member,
+                      isAdmin: false,
+                    );
                   },
                 );
               },
@@ -486,252 +488,5 @@ class _UnassignedTeamMembersSection extends StatelessWidget {
   }
 }
 
-class _TeamMemberCard extends StatelessWidget {
-  final TeamMemberData member;
-
-  const _TeamMemberCard({required this.member});
-
-  @override
-  Widget build(BuildContext context) {
-    print('🏗️ _TeamMemberCard.build çağrıldı - ${member.name}');
-    print('🏗️ photoUrl: ${member.photoUrl?.substring(0, member.photoUrl!.length > 50 ? 50 : member.photoUrl!.length) ?? "YOK"}...');
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0E17),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF2196F3).withOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: SizeHelper.isMobile(context) ? 16 : 20),
-          // Fotoğraf
-          Builder(
-            builder: (context) {
-              final photoUrl = member.photoUrl;
-              final screenWidth = MediaQuery.of(context).size.width;
-              final imageSize = screenWidth < 600 ? 80.0 : (screenWidth < 1024 ? 90.0 : 100.0);
-              
-              print('🖼️ Fotoğraf gösteriliyor - member: ${member.name}, photoUrl: $photoUrl');
-              
-              if (photoUrl != null && photoUrl.isNotEmpty) {
-                // URL'i normalize et
-                String normalizedUrl = photoUrl;
-                try {
-                  // URL'i parse et ve tekrar oluştur (encoding sorunlarını çözer)
-                  final uri = Uri.parse(photoUrl);
-                  normalizedUrl = uri.toString();
-                  print('🔄 Normalized URL: $normalizedUrl');
-                } catch (e) {
-                  print('⚠️ URL parse hatası: $e, orijinal URL kullanılıyor');
-                }
-                
-                // Flutter web'de CORS sorununu çözmek için HTML img elementi kullan
-                if (kIsWeb) {
-                  // Unique ID oluştur
-                  final imageId = 'team_img_${member.id ?? DateTime.now().millisecondsSinceEpoch}';
-                  
-                  // HTML img elementi oluştur
-                  final imgElement = html.ImageElement()
-                    ..src = normalizedUrl
-                    ..style.width = '${imageSize}px'
-                    ..style.height = '${imageSize}px'
-                    ..style.objectFit = 'cover'
-                    ..style.borderRadius = '12px'
-                    ..style.cursor = 'pointer'
-                    ..onError.listen((_) {
-                      print('❌ Team Page - HTML img yükleme hatası: $normalizedUrl');
-                    })
-                    ..onLoad.listen((_) {
-                      print('✅ Team Page - HTML img yüklendi: $normalizedUrl');
-                    });
-                  
-                  // Platform view registry'ye kaydet
-                  ui_web.platformViewRegistry.registerViewFactory(
-                    imageId,
-                    (int viewId) => imgElement,
-                  );
-                  
-                  return GestureDetector(
-                    onTap: () {
-                      ImageViewerDialog.show(context, normalizedUrl, title: member.name);
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: imageSize,
-                        height: imageSize,
-                        child: HtmlElementView(viewType: imageId),
-                      ),
-                    ),
-                  );
-                } else {
-                  // Mobile için normal Image.network kullan
-                  return GestureDetector(
-                    onTap: () {
-                      ImageViewerDialog.show(context, normalizedUrl, title: member.name);
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        normalizedUrl,
-                        width: imageSize,
-                        height: imageSize,
-                        fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          print('✅ Fotoğraf yüklendi: $photoUrl');
-                          return child;
-                        }
-                        return Container(
-                          width: imageSize,
-                          height: imageSize,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A2332),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                              color: const Color(0xFF2196F3),
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        print('❌ Fotoğraf yükleme hatası: $error');
-                        return Container(
-                          width: imageSize,
-                          height: imageSize,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A2332),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            color: const Color(0xFF2196F3),
-                            size: imageSize * 0.5,
-                          ),
-                        );
-                      },
-                      ),
-                    ),
-                  );
-                }
-              } else {
-                print('⚠️ Fotoğraf URL yok - member: ${member.name}');
-                final imageSize = MediaQuery.of(context).size.width < 600 ? 80.0 : (MediaQuery.of(context).size.width < 1024 ? 90.0 : 100.0);
-                return Container(
-                  width: imageSize,
-                  height: imageSize,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A2332),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    color: const Color(0xFF2196F3),
-                    size: imageSize * 0.5,
-                  ),
-                );
-              }
-            },
-          ),
-          SizedBox(height: SizeHelper.isMobile(context) ? 10 : 12),
-          // İsim
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: SizeHelper.isMobile(context) ? 10 : 12),
-            child: Text(
-              member.name,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: SizeHelper.clampFontSize(
-                  MediaQuery.of(context).size.width,
-                  14,
-                  16,
-                  18,
-                ),
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(height: SizeHelper.isMobile(context) ? 5 : 6),
-          // Ünvan
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: SizeHelper.isMobile(context) ? 10 : 12),
-            child: Text(
-              member.title,
-              style: TextStyle(
-                color: const Color(0xFF2196F3),
-                fontSize: SizeHelper.clampFontSize(
-                  MediaQuery.of(context).size.width,
-                  11,
-                  13,
-                  15,
-                ),
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(height: SizeHelper.isMobile(context) ? 5 : 6),
-          // Bölüm
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: SizeHelper.isMobile(context) ? 10 : 12),
-            child: Text(
-              member.department,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: SizeHelper.clampFontSize(
-                  MediaQuery.of(context).size.width,
-                  10,
-                  12,
-                  14,
-                ),
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          // Sınıf (varsa)
-          if (member.className != null && member.className!.isNotEmpty) ...[
-            SizedBox(height: SizeHelper.isMobile(context) ? 3 : 4),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: SizeHelper.isMobile(context) ? 10 : 12),
-              child: Text(
-                member.className!,
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: SizeHelper.clampFontSize(
-                    MediaQuery.of(context).size.width,
-                    9,
-                    11,
-                    13,
-                  ),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-          SizedBox(height: SizeHelper.isMobile(context) ? 16 : 20),
-        ],
-      ),
-    );
-  }
-}
+// _TeamMemberCard removed - using shared TeamMemberCard widget
 

@@ -470,6 +470,7 @@ class FirestoreService {
       return {
         'siteName': '',
         'siteDescription': '',
+        'aboutDescription': 'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.',
         'email': '',
         'phone': '',
         'address': '',
@@ -491,6 +492,7 @@ class FirestoreService {
         return {
           'siteName': '',
           'siteDescription': '',
+          'aboutDescription': 'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.',
           'email': '',
           'phone': '',
           'address': '',
@@ -1115,6 +1117,25 @@ class FirestoreService {
     }
   }
 
+  Future<DocumentReference> addAboutSectionAndGetRef(AboutSectionData section) async {
+    try {
+      return await _firestore.collection(_aboutSectionsCollection).add(section.toMap());
+    } on FirebaseException catch (e) {
+      print('❌ addAboutSectionAndGetRef FirebaseException: ${e.code} - ${e.message}');
+      if (e.code == 'permission-denied' || e.code == 'PERMISSION_DENIED') {
+        throw 'Firestore izin hatası. Firebase Console\'da Firestore Security Rules\'ı kontrol edin:\n\n'
+            'about_sections koleksiyonu için yazma izni verilmelidir.';
+      } else if (e.code == 'unavailable') {
+        throw 'Firestore şu anda kullanılamıyor. Lütfen internet bağlantınızı kontrol edin.';
+      } else {
+        throw 'Hakkımızda bölümü eklenirken bir hata oluştu: ${e.message}';
+      }
+    } catch (e) {
+      print('❌ addAboutSectionAndGetRef hatası: $e');
+      rethrow;
+    }
+  }
+
   Future<void> updateAboutSection(String sectionId, AboutSectionData section) async {
     try {
       await _firestore
@@ -1552,6 +1573,7 @@ class HomeSectionData {
   final List<String> images; // Resim URL'leri listesi
   final int order; // Sıralama
   final bool visible; // Görünürlük
+  final String type; // Bölüm tipi: 'imageOnly', 'textOnly', 'both'
 
   HomeSectionData({
     this.id,
@@ -1560,6 +1582,7 @@ class HomeSectionData {
     this.images = const [],
     this.order = 0,
     this.visible = true,
+    this.type = 'both', // Varsayılan: hem görsel hem yazı
   });
 
   Map<String, dynamic> toMap() {
@@ -1569,6 +1592,7 @@ class HomeSectionData {
       'images': images,
       'order': order,
       'visible': visible,
+      'type': type,
     };
   }
 
@@ -1583,6 +1607,24 @@ class HomeSectionData {
       imageList = [data['imageUrl'] as String];
     }
     
+    // Type belirlenmesi: Eğer type yoksa, mevcut verilere göre otomatik belirle
+    String sectionType = data['type'] as String? ?? 'both';
+    if (sectionType.isEmpty) {
+      // Eski veriler için otomatik tip belirleme
+      final hasImages = imageList.isNotEmpty;
+      final hasText = (data['title']?.toString().isNotEmpty == true) || 
+                      (data['description']?.toString().isNotEmpty == true);
+      if (hasImages && hasText) {
+        sectionType = 'both';
+      } else if (hasImages) {
+        sectionType = 'imageOnly';
+      } else if (hasText) {
+        sectionType = 'textOnly';
+      } else {
+        sectionType = 'both'; // Varsayılan
+      }
+    }
+    
     return HomeSectionData(
       id: doc.id,
       title: data['title']?.toString().isEmpty == true ? null : data['title']?.toString(),
@@ -1590,6 +1632,7 @@ class HomeSectionData {
       images: imageList,
       order: (data['order'] ?? 0) as int,
       visible: data['visible'] ?? true,
+      type: sectionType,
     );
   }
 
@@ -1600,6 +1643,7 @@ class HomeSectionData {
     List<String>? images,
     int? order,
     bool? visible,
+    String? type,
   }) {
     return HomeSectionData(
       id: id ?? this.id,
@@ -1608,6 +1652,7 @@ class HomeSectionData {
       images: images ?? this.images,
       order: order ?? this.order,
       visible: visible ?? this.visible,
+      type: type ?? this.type,
     );
   }
 }
@@ -1618,7 +1663,7 @@ class AboutSectionData {
   final String title;
   final String subtitle;
   final String description;
-  final String imageUrl;
+  final String? imageUrl;
   final bool isImageRight;
   final String accentColor; // Hex color code (e.g., "#2196F3")
   final int order; // Sıralama
@@ -1629,7 +1674,7 @@ class AboutSectionData {
     required this.title,
     required this.subtitle,
     required this.description,
-    required this.imageUrl,
+    this.imageUrl,
     required this.isImageRight,
     required this.accentColor,
     this.order = 0,
@@ -1641,7 +1686,7 @@ class AboutSectionData {
       'title': title,
       'subtitle': subtitle,
       'description': description,
-      'imageUrl': imageUrl,
+      'imageUrl': imageUrl ?? '',
       'isImageRight': isImageRight,
       'accentColor': accentColor,
       'order': order,
@@ -1656,7 +1701,7 @@ class AboutSectionData {
       title: data['title'] ?? '',
       subtitle: data['subtitle'] ?? '',
       description: data['description'] ?? '',
-      imageUrl: data['imageUrl'] ?? '',
+      imageUrl: data['imageUrl'] as String?,
       isImageRight: data['isImageRight'] ?? true,
       accentColor: data['accentColor'] ?? '#2196F3',
       order: (data['order'] ?? 0) as int,

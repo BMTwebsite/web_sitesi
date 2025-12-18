@@ -37,7 +37,7 @@ class EmailService {
       final result = await callable.call({
         'to': verificationEmailAddress, // Onay maili bu adrese gidecek
         'userEmail': toEmail, // Kullanıcının email'i (email içeriğinde gösterilecek)
-        'subject': 'BMT Web Sitesi Onay Maili',
+        'subject': 'Bilgisayar Mühendisliği Topluluğu Onay Maili',
         'token': verificationToken,
         'link': verificationLink,
       }).timeout(

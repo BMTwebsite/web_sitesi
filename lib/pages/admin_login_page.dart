@@ -86,7 +86,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
+      backgroundColor: const Color(0xFF0A0E17),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(40),
@@ -156,7 +156,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.email, color: Colors.white70),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -202,7 +202,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                         },
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),

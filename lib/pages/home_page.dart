@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../providers/firestore_provider.dart';
 import '../services/firestore_service.dart';
 import '../utils/size_helper.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
 import '../widgets/image_viewer_dialog.dart';
-import 'dart:html' as html show window;
+import 'dart:html' as html;
+import 'dart:ui_web' as ui_web show platformViewRegistry;
 import 'admin_verify_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -37,24 +40,16 @@ class _HomePageState extends State<HomePage> {
     
     try {
       final hash = html.window.location.hash;
-      final fullUrl = html.window.location.href;
       final search = html.window.location.search ?? '';
-      
-      print('🔍 HomePage - URL kontrolü başlatılıyor...');
-      print('🔍 HomePage - Hash: $hash');
-      print('🔍 HomePage - Search: $search');
-      print('🔍 HomePage - Full URL: $fullUrl');
       
       String? token;
       
       // Yöntem 1: Hash'ten token parse et
       if (hash.isNotEmpty) {
         if (hash.contains('/admin-verify') && hash.contains('token=')) {
-          print('✅ HomePage - Admin verify linki hash\'te tespit edildi');
           final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
           if (tokenMatch != null && tokenMatch.group(1) != null) {
             token = Uri.decodeComponent(tokenMatch.group(1)!);
-            print('✅ HomePage - Token hash\'ten bulundu: $token');
           }
         }
       }
@@ -64,31 +59,28 @@ class _HomePageState extends State<HomePage> {
         try {
           final searchUri = Uri.parse(search);
           token = searchUri.queryParameters['token'];
-          if (token != null && token.isNotEmpty) {
-            print('✅ HomePage - Token search\'ten bulundu: $token');
-          }
         } catch (e) {
-          print('⚠️ HomePage - Search parse hatası: $e');
+          if (kDebugMode) {
+            print('⚠️ HomePage - Search parse hatası: $e');
+          }
         }
       }
       
       // Yöntem 3: Full URL'den token parse et
       if (token == null || token.isEmpty) {
         try {
+          final fullUrl = html.window.location.href;
           final fullUri = Uri.parse(fullUrl);
           token = fullUri.queryParameters['token'];
-          if (token != null && token.isNotEmpty) {
-            print('✅ HomePage - Token full URL\'den bulundu: $token');
-          }
         } catch (e) {
-          print('⚠️ HomePage - Full URL parse hatası: $e');
+          if (kDebugMode) {
+            print('⚠️ HomePage - Full URL parse hatası: $e');
+          }
         }
       }
       
       // Token bulunduysa AdminVerifyPage'e yönlendir
       if (token != null && token.isNotEmpty) {
-        print('✅ HomePage - Token bulundu, AdminVerifyPage\'e yönlendiriliyor: $token');
-        // Hemen yönlendir (microtask yerine direkt)
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
@@ -97,12 +89,12 @@ class _HomePageState extends State<HomePage> {
             (route) => false, // Tüm önceki route'ları temizle
           );
         }
-      } else {
-        print('⚠️ HomePage - Token bulunamadı');
       }
     } catch (e, stackTrace) {
-      print('❌ HomePage - URL kontrolü hatası: $e');
-      print('📚 Stack trace: $stackTrace');
+      if (kDebugMode) {
+        print('❌ HomePage - URL kontrolü hatası: $e');
+        print('📚 Stack trace: $stackTrace');
+      }
     }
   }
 
@@ -124,7 +116,6 @@ class _HomePageState extends State<HomePage> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                const _AnnouncementsAlertSection(),
                 const _HeroSection(),
                 const _HomeSectionsList(),
                 const _StatisticsSection(),
@@ -140,6 +131,173 @@ class _HomePageState extends State<HomePage> {
 
 
 
+// Performance: Hero section için skeleton widget - ilk yüklemede daha hızlı görünüm
+Widget _buildHeroSkeleton(BuildContext context) {
+  final isMobile = SizeHelper.isMobile(context);
+  final isTablet = SizeHelper.isTablet(context);
+  
+  return Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF0A0E17),
+          const Color(0xFF1A2332).withOpacity(0.3),
+          const Color(0xFF0A0E17),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ),
+    ),
+    padding: EdgeInsets.symmetric(
+      horizontal: isMobile ? 16 : (isTablet ? 32 : 60),
+      vertical: isMobile ? 24 : (isTablet ? 40 : 80),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = constraints.maxWidth < 1000;
+        
+        if (isSmallScreen) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Skeleton: Badge
+              Container(
+                width: 200,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              SizedBox(height: isMobile ? 16 : 24),
+              // Skeleton: Title lines
+              Container(
+                width: double.infinity,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                width: double.infinity * 0.8,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                width: double.infinity * 0.7,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              SizedBox(height: 20),
+              // Skeleton: Description
+              Container(
+                width: double.infinity,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              SizedBox(height: 20),
+              // Skeleton: Image
+              Container(
+                height: isMobile ? 200 : 300,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ],
+          );
+        }
+        
+        // Büyük ekranlar için
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Skeleton: Badge
+                  Container(
+                    width: 250,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  // Skeleton: Title lines
+                  Container(
+                    width: double.infinity,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    width: double.infinity * 0.8,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    width: double.infinity * 0.7,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  // Skeleton: Description
+                  Container(
+                    width: double.infinity,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 40),
+            Expanded(
+              flex: 1,
+              child: Container(
+                height: isMobile ? 300 : 600,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2332),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 class _HeroSection extends StatelessWidget {
   const _HeroSection();
 
@@ -150,16 +308,14 @@ class _HeroSection extends StatelessWidget {
         stream: firestoreProvider.getHomeSections(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(),
-              ),
-            );
+            // Performance: Hafif skeleton ekranı - daha hızlı algılanan performans
+            return _buildHeroSkeleton(context);
           }
 
           if (snapshot.hasError) {
-            print('❌ Home sections hatası: ${snapshot.error}');
+            if (kDebugMode) {
+              print('❌ Home sections hatası: ${snapshot.error}');
+            }
             // Hata durumunda varsayılan içeriği göster
             return _buildDefaultHeroSection(context);
           }
@@ -308,25 +464,56 @@ class _HeroSection extends StatelessWidget {
                       child: Image.network(
                         'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop',
                         fit: BoxFit.cover,
+                        // Performance: Optimized loading with progress and cache
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF2196F3),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
+                          // Skeleton placeholder - daha hafif
                           return Container(
                             color: const Color(0xFF1A2332),
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.white54,
-                                size: 64,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: const Color(0xFF2196F3),
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
                               ),
                             ),
                           );
+                        },
+                        // Performance: Cache optimization - görsel boyutunu sınırla
+                        cacheWidth: SizeHelper.isMobile(context) ? 400 : (SizeHelper.isTablet(context) ? 600 : 800),
+                        cacheHeight: SizeHelper.isMobile(context) ? 300 : (SizeHelper.isTablet(context) ? 450 : 600),
+                        errorBuilder: (context, error, stackTrace) {
+                          // Image.network başarısız olursa HTML img dene
+                          try {
+                            final imageUrl = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop';
+                            final imageId = 'default_hero_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+                            
+                            final imgElement = html.ImageElement()
+                              ..src = imageUrl
+                              ..style.width = '100%'
+                              ..style.height = '100%'
+                              ..style.objectFit = 'cover';
+                            
+                            ui_web.platformViewRegistry.registerViewFactory(
+                              imageId,
+                              (int viewId) => imgElement,
+                            );
+                            
+                            return HtmlElementView(viewType: imageId);
+                          } catch (e) {
+                            return Container(
+                              color: const Color(0xFF1A2332),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white54,
+                                  size: 64,
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ),
@@ -442,25 +629,56 @@ class _HeroSection extends StatelessWidget {
                       child: Image.network(
                         'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop',
                         fit: BoxFit.cover,
+                        // Performance: Optimized loading with progress and cache
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF2196F3),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
+                          // Skeleton placeholder - daha hafif
                           return Container(
                             color: const Color(0xFF1A2332),
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.white54,
-                                size: 64,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: const Color(0xFF2196F3),
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
                               ),
                             ),
                           );
+                        },
+                        // Performance: Cache optimization - görsel boyutunu sınırla
+                        cacheWidth: SizeHelper.isMobile(context) ? 400 : (SizeHelper.isTablet(context) ? 600 : 800),
+                        cacheHeight: SizeHelper.isMobile(context) ? 300 : (SizeHelper.isTablet(context) ? 450 : 600),
+                        errorBuilder: (context, error, stackTrace) {
+                          // Image.network başarısız olursa HTML img dene
+                          try {
+                            final imageUrl = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop';
+                            final imageId = 'default_hero_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+                            
+                            final imgElement = html.ImageElement()
+                              ..src = imageUrl
+                              ..style.width = '100%'
+                              ..style.height = '100%'
+                              ..style.objectFit = 'cover';
+                            
+                            ui_web.platformViewRegistry.registerViewFactory(
+                              imageId,
+                              (int viewId) => imgElement,
+                            );
+                            
+                            return HtmlElementView(viewType: imageId);
+                          } catch (e) {
+                            return Container(
+                              color: const Color(0xFF1A2332),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white54,
+                                  size: 64,
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ),
@@ -529,95 +747,18 @@ class _HeroSection extends StatelessWidget {
                 ],
                 if (section.images.isNotEmpty) ...[
                   SizedBox(height: isMobile ? 16 : (isTablet ? 24 : 40)),
-                  if (section.images.length == 1)
-                    Container(
-                      height: isMobile ? 200 : (isTablet ? 300 : 400),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        color: const Color(0xFF1A2332),
-                      ),
-                      child: GestureDetector(
-                        onTap: () {
-                          ImageViewerDialog.show(context, section.images[0]);
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.network(
-                            section.images[0],
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFF2196F3),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: const Color(0xFF1A2332),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.image_not_supported,
-                                    color: Colors.white54,
-                                    size: 64,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: section.images.map((imageUrl) {
-                        return GestureDetector(
-                          onTap: () {
-                            ImageViewerDialog.show(context, imageUrl);
-                          },
-                          child: Container(
-                            width: isMobile 
-                                ? (MediaQuery.of(context).size.width - 32 - 12) / 2
-                                : (isTablet ? 200 : 250),
-                            height: isMobile ? 150 : (isTablet ? 200 : 250),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              color: const Color(0xFF1A2332),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: Image.network(
-                                imageUrl,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF2196F3),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: const Color(0xFF1A2332),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.image_not_supported,
-                                        color: Colors.white54,
-                                        size: 32,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      if (kDebugMode) {
+                        print('🖼️ Hero section images: ${section.images}');
+                      }
+                      return _HeroImageSlider(
+                        images: section.images,
+                        section: section,
+                        height: isMobile ? 200 : (isTablet ? 300 : 400),
+                      );
+                    },
+                  ),
                 ],
               ],
             );
@@ -661,44 +802,17 @@ class _HeroSection extends StatelessWidget {
                 SizedBox(width: SizeHelper.safeSize(value: 40, min: 20, max: 60, context: 'Spacing')),
                 Expanded(
                   flex: 1,
-                  child: Container(
-                    height: isMobile ? 300 : (isTablet ? 450 : 600),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: const Color(0xFF1A2332),
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        ImageViewerDialog.show(context, section.images[0]);
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          section.images[0],
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF2196F3),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: const Color(0xFF1A2332),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.white54,
-                                  size: 64,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  child: Builder(
+                    builder: (context) {
+                      if (kDebugMode) {
+                        print('🖼️ Hero section images (large screen): ${section.images}');
+                      }
+                      return _HeroImageSlider(
+                        images: section.images,
+                        section: section,
+                        height: isMobile ? 300 : (isTablet ? 450 : 600),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -754,6 +868,14 @@ class _HomeSectionsList extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = SizeHelper.isMobile(context);
     final isTablet = SizeHelper.isTablet(context);
+    final sectionType = section.type;
+    
+    // Bölüm tipine göre içerik kontrolü
+    final showText = (sectionType == 'textOnly' || sectionType == 'both') && 
+                     ((section.title != null && section.title!.isNotEmpty) || 
+                      (section.description != null && section.description!.isNotEmpty));
+    final showImages = (sectionType == 'imageOnly' || sectionType == 'both') && 
+                       section.images.isNotEmpty;
     
     return Container(
       decoration: BoxDecoration(
@@ -780,6 +902,46 @@ class _HomeSectionsList extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (showText) ...[
+                  if (section.title != null && section.title!.isNotEmpty)
+                    Text(
+                      section.title!,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: SizeHelper.clampFontSize(screenWidth, 20, 28, 36),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  if (section.description != null && section.description!.isNotEmpty) ...[
+                    if (section.title != null && section.title!.isNotEmpty)
+                      const SizedBox(height: 12),
+                    Text(
+                      section.description!,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: SizeHelper.clampFontSize(screenWidth, 13, 15, 18),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ],
+                if (showImages) ...[
+                  if (showText) const SizedBox(height: 20),
+                  _buildImageSlider(context, section.images, isMobile, isTablet, section: section),
+                ],
+              ],
+            );
+          }
+          
+          // Büyük ekranlar için layout
+          if (sectionType == 'imageOnly') {
+            // Sadece görsel
+            return _buildImageSlider(context, section.images, isMobile, isTablet, section: section);
+          } else if (sectionType == 'textOnly') {
+            // Sadece yazı
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 if (section.title != null && section.title!.isNotEmpty)
                   Text(
                     section.title!,
@@ -790,7 +952,8 @@ class _HomeSectionsList extends StatelessWidget {
                     ),
                   ),
                 if (section.description != null && section.description!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  if (section.title != null && section.title!.isNotEmpty)
+                    const SizedBox(height: 12),
                   Text(
                     section.description!,
                     style: TextStyle(
@@ -800,320 +963,618 @@ class _HomeSectionsList extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (section.images.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Container(
-                    height: isMobile ? 200 : (isTablet ? 300 : 400),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: const Color(0xFF1A2332),
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        ImageViewerDialog.show(context, section.images[0]);
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          section.images[0],
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF2196F3),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: const Color(0xFF1A2332),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.white54,
-                                  size: 64,
-                                ),
-                              ),
-                            );
-                          },
+              ],
+            );
+          } else {
+            // İkisi birlikte
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (section.title != null && section.title!.isNotEmpty)
+                        Text(
+                          section.title!,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 20, 28, 36),
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ),
+                      if (section.description != null && section.description!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          section.description!,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: SizeHelper.clampFontSize(screenWidth, 13, 15, 18),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (showImages) ...[
+                  SizedBox(width: SizeHelper.safeSize(value: 40, min: 20, max: 60, context: 'Spacing')),
+                  Expanded(
+                    flex: 1,
+                    child: _buildImageSlider(context, section.images, isMobile, isTablet, section: section),
                   ),
                 ],
               ],
             );
           }
+        },
+      ),
+    );
+  }
+
+  // Image.network helper metodu (hem web hem mobile için)
+  Widget _buildWebImageHelper(String imageUrl, BuildContext context) {
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      headers: const {'Cache-Control': 'max-age=3600'},
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(color: Color(0xFF2196F3)),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (kDebugMode) {
+          print('❌ Home Section Image load error for URL: $imageUrl');
+          print('❌ Error: $error');
+        }
+        // Image.network başarısız olursa HTML img dene
+        try {
+          final imageId = 'section_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
           
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (section.title != null && section.title!.isNotEmpty)
-                      Text(
-                        section.title!,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: SizeHelper.clampFontSize(screenWidth, 20, 28, 36),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    if (section.description != null && section.description!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        section.description!,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: SizeHelper.clampFontSize(screenWidth, 13, 15, 18),
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+          final imgElement = html.ImageElement()
+            ..src = imageUrl
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'cover';
+          
+          ui_web.platformViewRegistry.registerViewFactory(
+            imageId,
+            (int viewId) => imgElement,
+          );
+          
+          return HtmlElementView(viewType: imageId);
+        } catch (e) {
+          // Her iki yöntem de başarısız olursa hata göster
+          return Container(
+            color: const Color(0xFF1A2332),
+            child: const Center(
+              child: Icon(Icons.image_not_supported, color: Colors.white54, size: 64),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  // Çoklu görseller için otomatik slider widget'ı
+  Widget _buildImageSlider(BuildContext context, List<String> images, bool isMobile, bool isTablet, {HomeSectionData? section}) {
+    if (images.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Tek görsel varsa normal göster
+    if (images.length == 1) {
+      return Container(
+        height: isMobile ? 200 : (isTablet ? 300 : 400),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFF1A2332),
+        ),
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () {
+                ImageViewerDialog.show(context, images[0]);
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: _buildWebImageHelper(images[0], context),
               ),
-              if (section.images.isNotEmpty) ...[
-                SizedBox(width: SizeHelper.safeSize(value: 40, min: 20, max: 60, context: 'Spacing')),
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    height: isMobile ? 300 : (isTablet ? 450 : 600),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: const Color(0xFF1A2332),
-                    ),
-                    child: GestureDetector(
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Çoklu görsel varsa slider göster
+    return _ImageSliderWidget(
+      images: images,
+      height: isMobile ? 200 : (isTablet ? 300 : 400),
+      section: section,
+    );
+  }
+}
+
+// Hero section için özel slider widget'ı (admin düzenleme butonu ile)
+class _HeroImageSlider extends StatefulWidget {
+  final List<String> images;
+  final HomeSectionData section;
+  final double height;
+
+  const _HeroImageSlider({
+    required this.images,
+    required this.section,
+    required this.height,
+  });
+
+  @override
+  State<_HeroImageSlider> createState() => _HeroImageSliderState();
+}
+
+class _HeroImageSliderState extends State<_HeroImageSlider> {
+  PageController? _pageController;
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.images.length > 1) {
+      _pageController = PageController();
+      // 5 saniyede bir otomatik geçiş
+      _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+        if (mounted && widget.images.length > 1 && _pageController != null) {
+          final nextIndex = (_currentIndex + 1) % widget.images.length;
+          _pageController!.animateToPage(
+            nextIndex,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  // Web için Image.network kullan (daha güvenilir ve CORS sorunlarını daha iyi yönetir)
+  Widget _buildWebImage(String imageUrl, BuildContext context) {
+    // Hem web hem mobile için Image.network kullan
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      headers: const {
+        'Cache-Control': 'max-age=3600',
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2196F3),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (kDebugMode) {
+          print('❌ Image load error for URL: $imageUrl');
+          print('❌ Error: $error');
+          print('❌ StackTrace: $stackTrace');
+        }
+        // Image.network başarısız olursa HTML img dene
+        try {
+          final imageId = 'hero_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+          
+          final imgElement = html.ImageElement()
+            ..src = imageUrl
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'cover';
+          
+          ui_web.platformViewRegistry.registerViewFactory(
+            imageId,
+            (int viewId) => imgElement,
+          );
+          
+          return HtmlElementView(viewType: imageId);
+        } catch (e) {
+          // Her iki yöntem de başarısız olursa hata göster
+          return Container(
+            color: const Color(0xFF1A2332),
+            child: const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                color: Colors.white54,
+                size: 64,
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.images.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      height: widget.height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF1A2332),
+      ),
+      child: Stack(
+        children: [
+          widget.images.length == 1
+              ? GestureDetector(
+                  onTap: () {
+                    ImageViewerDialog.show(context, widget.images[0]);
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: _buildWebImage(widget.images[0], context),
+                  ),
+                )
+              : PageView.builder(
+                  controller: _pageController!,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  itemCount: widget.images.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
                       onTap: () {
-                        ImageViewerDialog.show(context, section.images[0]);
+                        ImageViewerDialog.show(context, widget.images[index]);
                       },
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          section.images[0],
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF2196F3),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: const Color(0xFF1A2332),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.white54,
-                                  size: 64,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                        child: _buildWebImage(widget.images[index], context),
+                      ),
+                    );
+                  },
+                ),
+          // İndikatörler (çoklu görsel varsa)
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 16,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  widget.images.length,
+                  (index) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _currentIndex == index
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Sol ok butonu (çoklu görsel varsa)
+          if (widget.images.length > 1)
+            Positioned(
+              left: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      if (_pageController != null && widget.images.length > 1) {
+                        final previousIndex = (_currentIndex - 1 + widget.images.length) % widget.images.length;
+                        _pageController!.animateToPage(
+                          previousIndex,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_left,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ],
-          );
-        },
+              ),
+            ),
+          // Sağ ok butonu (çoklu görsel varsa)
+          if (widget.images.length > 1)
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      if (_pageController != null && widget.images.length > 1) {
+                        final nextIndex = (_currentIndex + 1) % widget.images.length;
+                        _pageController!.animateToPage(
+                          nextIndex,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _AnnouncementsAlertSection extends StatelessWidget {
-  const _AnnouncementsAlertSection();
+// Otomatik slider widget'ı
+class _ImageSliderWidget extends StatefulWidget {
+  final List<String> images;
+  final double height;
+  final HomeSectionData? section;
+
+  const _ImageSliderWidget({
+    required this.images,
+    required this.height,
+    this.section,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<FirestoreProvider>(
-      builder: (context, firestoreProvider, _) => StreamBuilder<List<AnnouncementData>>(
-        stream: firestoreProvider.getAnnouncements(limit: 3),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SizedBox.shrink();
-          }
+  State<_ImageSliderWidget> createState() => _ImageSliderWidgetState();
+}
 
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-            return const SizedBox.shrink();
-          }
+class _ImageSliderWidgetState extends State<_ImageSliderWidget> {
+  late PageController _pageController;
+  int _currentIndex = 0;
+  Timer? _timer;
 
-          final announcements = snapshot.data!;
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    // 5 saniyede bir otomatik geçiş
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted) {
+        final nextIndex = (_currentIndex + 1) % widget.images.length;
+        _pageController.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // Image.network kullan (hem web hem mobile için)
+  Widget _buildWebImage(String imageUrl, BuildContext context) {
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      headers: const {
+        'Cache-Control': 'max-age=3600',
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2196F3),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        if (kDebugMode) {
+          print('❌ Section Image load error for URL: $imageUrl');
+          print('❌ Error: $error');
+          print('❌ StackTrace: $stackTrace');
+        }
+        // Image.network başarısız olursa HTML img dene
+        try {
+          final imageId = 'slider_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
           
-          // Sadece son 3 duyuruyu göster
-          final recentAnnouncements = announcements.take(3).toList();
-
+          final imgElement = html.ImageElement()
+            ..src = imageUrl
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'cover';
+          
+          ui_web.platformViewRegistry.registerViewFactory(
+            imageId,
+            (int viewId) => imgElement,
+          );
+          
+          return HtmlElementView(viewType: imageId);
+        } catch (e) {
+          // Her iki yöntem de başarısız olursa hata göster
           return Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A0E17),
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: SizeHelper.isMobile(context) ? 16 : (SizeHelper.isTablet(context) ? 24 : 40),
-              vertical: 12,
-            ),
-            child: Column(
-              children: recentAnnouncements.map((announcement) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: announcement.color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: announcement.color.withOpacity(0.5),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.pushNamed(context, '/announcements');
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 10 : (SizeHelper.isTablet(context) ? 12 : 14)),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              color: announcement.color,
-                              size: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 18, 20, 22),
-                            ),
-                            SizedBox(width: SizeHelper.isMobile(context) ? 8 : (SizeHelper.isTablet(context) ? 10 : 12)),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 4,
-                                    children: [
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: MediaQuery.of(context).size.width < 768 ? 5 : (MediaQuery.of(context).size.width < 1024 ? 6 : 8),
-                                          vertical: MediaQuery.of(context).size.width < 768 ? 2 : (MediaQuery.of(context).size.width < 1024 ? 3 : 4),
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: announcement.color.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(5),
-                                        ),
-                                        child: Text(
-                                          _getTypeDisplayName(announcement.type),
-                                          style: TextStyle(
-                                            color: announcement.color,
-                                            fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 9, 10, 11),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    announcement.eventName,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 13, 14, 15),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 4,
-                                    children: [
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.calendar_today,
-                                            color: Colors.white70,
-                                            size: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 12, 13, 14),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              announcement.date,
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 11, 12, 13),
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.location_on,
-                                            color: Colors.white70,
-                                            size: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 12, 13, 14),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              announcement.address,
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 11, 12, 13),
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: SizeHelper.isMobile(context) ? 4 : 6),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              color: announcement.color,
-                              size: SizeHelper.clampFontSize(MediaQuery.of(context).size.width, 12, 14, 16),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+            color: const Color(0xFF1A2332),
+            child: const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                color: Colors.white54,
+                size: 64,
+              ),
             ),
           );
-        },
-      ),
+        }
+      },
     );
   }
 
-  String _getTypeDisplayName(String type) {
-    switch (type.toLowerCase()) {
-      case 'bölüm':
-        return 'Bölüm Duyurusu';
-      case 'etkinlik':
-        return 'Etkinlik Duyurusu';
-      case 'topluluk':
-        return 'Topluluk Duyurusu';
-      default:
-        return type;
-    }
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: widget.height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF1A2332),
+      ),
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            itemCount: widget.images.length,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () {
+                  ImageViewerDialog.show(context, widget.images[index]);
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: _buildWebImage(widget.images[index], context),
+                ),
+              );
+            },
+          ),
+          // İndikatörler
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.images.length,
+                (index) => Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentIndex == index
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Sol ok butonu (çoklu görsel varsa)
+          if (widget.images.length > 1)
+            Positioned(
+              left: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      final previousIndex = (_currentIndex - 1 + widget.images.length) % widget.images.length;
+                      _pageController.animateToPage(
+                        previousIndex,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_left,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Sağ ok butonu (çoklu görsel varsa)
+          if (widget.images.length > 1)
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      final nextIndex = (_currentIndex + 1) % widget.images.length;
+                      _pageController.animateToPage(
+                        nextIndex,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1345,7 +1806,7 @@ class _StatisticsSectionState extends State<_StatisticsSection> {
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0),
                           child: Text(
-                            'Topluluğumuzun başarılarını rakamlarla keşfedin',
+                            'Topluluğumuzun başarılarını sayılarla keşfedin',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white70,

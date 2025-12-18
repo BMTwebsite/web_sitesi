@@ -1,22 +1,84 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
+import 'dart:async';
+// Conditional imports for web-specific features
 import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
+import 'dart:ui_web' as ui_web show platformViewRegistry;
 import '../providers/auth_provider.dart';
 import '../providers/firestore_provider.dart';
 import '../services/storage_service.dart';
 import '../utils/size_helper.dart';
+import '../widgets/address_picker_dialog.dart';
+import '../widgets/announcement_card.dart';
+import '../widgets/event_card.dart';
+import '../widgets/team_member_card.dart';
+import '../widgets/sponsor_card.dart';
+import '../widgets/circular_logo_widget.dart';
 
 class AdminPanelPage extends StatefulWidget {
-  const AdminPanelPage({super.key});
+  final int? initialTab;
+  
+  const AdminPanelPage({super.key, this.initialTab});
 
   @override
   State<AdminPanelPage> createState() => _AdminPanelPageState();
 }
 
 class _AdminPanelPageState extends State<AdminPanelPage> {
-  int _selectedTab = 0;
+  late int _selectedTab;
+  
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab ?? 0;
+  }
+
+  // Helper function to create object URL from blob (web only)
+  String _createObjectUrlFromBlob(html.Blob blob) {
+    if (kIsWeb) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        return html.Url.createObjectUrlFromBlob(blob);
+      } catch (e) {
+        print('Error creating object URL from blob: $e');
+        return '';
+      }
+    }
+    return '';
+  }
+
+  // Helper function to create object URL for preview (web only)
+  String _createObjectUrl(PlatformFile file) {
+    if (kIsWeb && file.bytes != null) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        final blob = html.Blob([file.bytes!]);
+        // ignore: avoid_web_libraries_in_flutter
+        return _createObjectUrlFromBlob(blob);
+      } catch (e) {
+        print('Error creating object URL: $e');
+        return '';
+      }
+    }
+    // For mobile, return empty string - we'll use file.path or bytes directly
+    return '';
+  }
+
+
+  // Helper function to revoke object URL (web only)
+  void _revokeObjectUrl(String url) {
+    if (kIsWeb && url.isNotEmpty) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        html.Url.revokeObjectUrl(url);
+      } catch (e) {
+        print('Error revoking object URL: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +86,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     final isTablet = SizeHelper.isTablet(context);
     
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
+      backgroundColor: const Color(0xFF0A0E17),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -184,7 +246,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         ),
                         const SizedBox(width: 16),
                         _TabButton(
-                          label: 'Hakkımızda',
+                          label: 'Duyurular',
                           isSelected: _selectedTab == 1,
                           onTap: () => setState(() => _selectedTab = 1),
                         ),
@@ -196,19 +258,19 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         ),
                         const SizedBox(width: 16),
                         _TabButton(
-                          label: 'Duyurular',
+                          label: 'Ekip',
                           isSelected: _selectedTab == 3,
                           onTap: () => setState(() => _selectedTab = 3),
                         ),
                         const SizedBox(width: 16),
                         _TabButton(
-                          label: 'Ekip',
+                          label: 'Sponsorlar',
                           isSelected: _selectedTab == 4,
                           onTap: () => setState(() => _selectedTab = 4),
                         ),
                         const SizedBox(width: 16),
                         _TabButton(
-                          label: 'Sponsorlar',
+                          label: 'Hakkımızda',
                           isSelected: _selectedTab == 5,
                           onTap: () => setState(() => _selectedTab = 5),
                         ),
@@ -223,12 +285,12 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   ),
                   SizedBox(height: isMobile ? 20 : 30),
                   // Tab Content
-                  if (_selectedTab == 0) _buildSiteSettingsTab(),
-                  if (_selectedTab == 1) _buildAboutTab(),
+                  if (_selectedTab == 0) _buildHomeTab(),
+                  if (_selectedTab == 1) _buildAnnouncementsTab(),
                   if (_selectedTab == 2) _buildEventsTab(),
-                  if (_selectedTab == 3) _buildAnnouncementsTab(),
-                  if (_selectedTab == 4) _buildTeamsTab(),
-                  if (_selectedTab == 5) _buildSponsorsTab(),
+                  if (_selectedTab == 3) _buildTeamsTab(),
+                  if (_selectedTab == 4) _buildSponsorsTab(),
+                  if (_selectedTab == 5) _buildAboutTab(),
                   if (_selectedTab == 6) _buildContactSettingsTab(),
                 ],
               ),
@@ -240,80 +302,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
   }
 
 
-  Widget _buildEventsTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ElevatedButton.icon(
-          onPressed: () => _showAddEventDialog(context),
-          icon: const Icon(Icons.add),
-          label: const Text('Yeni Etkinlik Ekle'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2196F3),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 12,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Consumer<FirestoreProvider>(
-          builder: (context, firestoreProvider, _) => StreamBuilder<List<EventData>>(
-            stream: firestoreProvider.getEvents(),
-            builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'Hata: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              );
-            }
-
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(
-                child: Text(
-                  'Henüz etkinlik eklenmemiş.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              );
-            }
-
-            final events = snapshot.data!;
-
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-                childAspectRatio: 0.75,
-              ),
-              itemCount: events.length,
-              itemBuilder: (context, index) {
-                return _AdminEventCard(
-                  event: events[index],
-                  onEdit: () => _showEditEventDialog(context, events[index]),
-                  onDelete: () => _deleteEvent(events[index].id!),
-                );
-              },
-            );
-          },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSiteSettingsTab() {
+  Widget _buildHomeTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -380,10 +369,144 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
   }
 
+  Widget _buildEventsTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => _showAddEventDialog(context),
+          icon: const Icon(Icons.add),
+          label: const Text('Yeni Etkinlik Ekle'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2196F3),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 12,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Consumer<FirestoreProvider>(
+          builder: (context, firestoreProvider, _) => StreamBuilder<List<EventData>>(
+            stream: firestoreProvider.getEvents(),
+            builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Hata: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              );
+            }
+
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  'Henüz etkinlik eklenmemiş.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
+
+            final events = snapshot.data!;
+
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                childAspectRatio: 0.6,
+              ),
+              itemCount: events.length,
+              itemBuilder: (context, index) {
+                return EventCard(
+                  event: events[index],
+                  isAdmin: true,
+                  onEdit: () => _showEditEventDialog(context, events[index]),
+                  onDelete: () => _deleteEvent(events[index].id!),
+                );
+              },
+            );
+          },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAboutTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Hakkımızda Açıklaması Düzenleme Bölümü
+        Consumer<FirestoreProvider>(
+          builder: (context, firestoreProvider, _) => StreamBuilder<Map<String, dynamic>>(
+            stream: firestoreProvider.getSiteSettingsStream(),
+            builder: (context, settingsSnapshot) {
+              if (settingsSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              final settings = settingsSnapshot.data ?? {};
+              final aboutDescription = settings['aboutDescription'] ?? 
+                  'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.';
+              
+              return _AboutDescriptionEditor(
+                initialDescription: aboutDescription,
+                onSave: (newDescription) async {
+                  try {
+                    await firestoreProvider.updateSiteSettings({
+                      'aboutDescription': newDescription,
+                    });
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Hakkımızda açıklaması başarıyla güncellendi'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Hata: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 30),
+        const Divider(color: Colors.white24),
+        const SizedBox(height: 30),
+        const Text(
+          'Hakkımızda Bölümleri',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
         ElevatedButton.icon(
           onPressed: () => _showAddAboutSectionDialog(context),
           icon: const Icon(Icons.add),
@@ -529,12 +652,13 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   crossAxisCount: 4,
                   crossAxisSpacing: 20,
                   mainAxisSpacing: 20,
-                  childAspectRatio: 0.7,
+                  childAspectRatio: 0.6,
                 ),
                 itemCount: announcements.length,
                 itemBuilder: (context, index) {
-                  return _AdminAnnouncementCard(
+                  return AnnouncementCard(
                     announcement: announcements[index],
+                    isAdmin: true,
                     onEdit: () => _showEditAnnouncementDialog(context, announcements[index]),
                     onDelete: () => _deleteAnnouncement(announcements[index].id!),
                   );
@@ -555,6 +679,59 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     _showEventDialog(context, event: event);
   }
 
+  // Helper function to parse date string to DateTime
+  DateTime? _parseDate(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return null;
+    try {
+      // Try common date formats
+      final formats = [
+        'dd.MM.yyyy',
+        'dd/MM/yyyy',
+        'yyyy-MM-dd',
+        'dd-MM-yyyy',
+      ];
+      for (final format in formats) {
+        try {
+          return DateFormat(format).parse(dateString);
+        } catch (_) {}
+      }
+      // Try default DateTime parsing
+      return DateTime.tryParse(dateString);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Helper function to format DateTime to Turkish format
+  String _formatDate(DateTime date) {
+    return DateFormat('dd.MM.yyyy').format(date);
+  }
+
+  // Helper function to parse time string
+  TimeOfDay? _parseTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return null;
+    try {
+      // Try HH:mm format
+      final parts = timeString.split(':');
+      if (parts.length >= 2) {
+        final hour = int.tryParse(parts[0]);
+        final minute = int.tryParse(parts[1]);
+        if (hour != null && minute != null) {
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+      // Try other common formats
+      return TimeOfDay.fromDateTime(DateTime.parse('2000-01-01 $timeString'));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Helper function to format TimeOfDay to HH:mm format
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
   void _showEventDialog(BuildContext context, {EventData? event}) {
     final isEditing = event != null;
     final formKey = GlobalKey<FormState>();
@@ -571,21 +748,15 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     final registrationFormLinkController = TextEditingController(
       text: event?.registrationFormLink ?? '',
     );
-    final latitudeController = TextEditingController(
-      text: event?.locationCoordinates?['latitude']?.toString() ?? '',
-    );
-    final longitudeController = TextEditingController(
-      text: event?.locationCoordinates?['longitude']?.toString() ?? '',
-    );
     
     String selectedColor = event?.colorHex ?? '#2196F3';
     final colorOptions = ['#2196F3', '#F44336', '#4CAF50', '#FF9800', '#9C27B0'];
     
     // Image state
-    List<html.File> selectedFiles = [];
+    List<PlatformFile> selectedFiles = [];
     List<String> existingImageUrls = event?.images ?? [];
     List<String> imageUrlsToDelete = [];
-    Map<html.File, String> fileObjectUrls = {};
+    Map<PlatformFile, String> fileObjectUrls = {};
 
     showDialog(
       context: context,
@@ -610,7 +781,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Etkinlik Türü',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -623,50 +794,128 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Etkinlik Adı',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
                           value?.isEmpty ?? true ? 'Etkinlik adı gerekli' : null,
                     ),
                     const SizedBox(height: 16),
+                    // Date picker field
                     TextFormField(
                       controller: dateController,
-                      decoration: const InputDecoration(
+                      readOnly: true,
+                      decoration: InputDecoration(
                         labelText: 'Tarih',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: const Color(0xFF0A0E17),
+                        suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
                           value?.isEmpty ?? true ? 'Tarih gerekli' : null,
+                      onTap: () async {
+                        final initialDate = _parseDate(dateController.text) ?? DateTime.now();
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: initialDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: Color(0xFF2196F3),
+                                  onPrimary: Colors.white,
+                                  surface: Color(0xFF1A2332),
+                                  onSurface: Colors.white,
+                                ),
+                                dialogBackgroundColor: const Color(0xFF1A2332),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedDate != null) {
+                          dateController.text = _formatDate(pickedDate);
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
+                    // Time picker field
                     TextFormField(
                       controller: timeController,
-                      decoration: const InputDecoration(
+                      readOnly: true,
+                      decoration: InputDecoration(
                         labelText: 'Saat',
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: const Color(0xFF0A0E17),
+                        suffixIcon: const Icon(Icons.access_time, color: Colors.white70),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
                           value?.isEmpty ?? true ? 'Saat gerekli' : null,
+                      onTap: () async {
+                        final initialTime = _parseTime(timeController.text) ?? TimeOfDay.now();
+                        final pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: initialTime,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: Color(0xFF2196F3),
+                                  onPrimary: Colors.white,
+                                  surface: Color(0xFF1A2332),
+                                  onSurface: Colors.white,
+                                ),
+                                dialogBackgroundColor: const Color(0xFF1A2332),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedTime != null) {
+                          timeController.text = _formatTime(pickedTime);
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: locationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Konum',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Konum gerekli' : null,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: locationController,
+                            decoration: const InputDecoration(
+                              labelText: 'Konum (İsteğe Bağlı)',
+                              labelStyle: TextStyle(color: Colors.white70),
+                              filled: true,
+                              fillColor: Color(0xFF0A0E17),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.map, color: Color(0xFF2196F3)),
+                          tooltip: 'Haritadan Seç',
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AddressPickerDialog(
+                                initialAddress: locationController.text,
+                                onAddressSelected: (address, latitude, longitude) {
+                                  setState(() {
+                                    locationController.text = address;
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -677,50 +926,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelStyle: TextStyle(color: Colors.white70),
                         hintStyle: TextStyle(color: Colors.white38),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Konum Koordinatları (İsteğe Bağlı - Haritada gösterim için)',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: latitudeController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'Enlem (Latitude)',
-                              hintText: '40.123456',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              hintStyle: TextStyle(color: Colors.white38),
-                              filled: true,
-                              fillColor: Color(0xFF0A1929),
-                            ),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: longitudeController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'Boylam (Longitude)',
-                              hintText: '27.123456',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              hintStyle: TextStyle(color: Colors.white38),
-                              filled: true,
-                              fillColor: Color(0xFF0A1929),
-                            ),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -730,7 +938,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Katılımcı Sayısı',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -802,7 +1010,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
-                                        color: const Color(0xFF0A1929),
+                                        color: const Color(0xFF0A0E17),
                                         child: const Icon(
                                           Icons.broken_image,
                                           color: Colors.white54,
@@ -876,7 +1084,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) {
                                           return Container(
-                                            color: const Color(0xFF0A1929),
+                                            color: const Color(0xFF0A0E17),
                                             child: const Icon(
                                               Icons.broken_image,
                                               color: Colors.white54,
@@ -895,7 +1103,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                                       setState(() {
                                         final objectUrl = fileObjectUrls[file];
                                         if (objectUrl != null) {
-                                          html.Url.revokeObjectUrl(objectUrl);
+                                          _revokeObjectUrl(objectUrl);
                                           fileObjectUrls.remove(file);
                                         }
                                         selectedFiles.removeAt(index);
@@ -932,23 +1140,21 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                           );
                           return;
                         }
-                        final input = html.FileUploadInputElement()
-                          ..accept = 'image/*'
-                          ..multiple = true;
-                        input.click();
-                        input.onChange.listen((e) {
-                          final files = input.files;
-                          if (files != null) {
+                        FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                          allowMultiple: true,
+                        ).then((result) {
+                          if (result != null && result.files.isNotEmpty) {
                             setState(() {
                               final remainingSlots = 5 - 
                                   (existingImageUrls.length - imageUrlsToDelete.length) - 
                                   selectedFiles.length;
-                              final filesToAdd = files.length > remainingSlots
-                                  ? files.sublist(0, remainingSlots)
-                                  : files;
+                              final filesToAdd = result.files.length > remainingSlots
+                                  ? result.files.sublist(0, remainingSlots)
+                                  : result.files;
                               for (final file in filesToAdd) {
                                 selectedFiles.add(file);
-                                fileObjectUrls[file] = html.Url.createObjectUrl(file);
+                                fileObjectUrls[file] = _createObjectUrl(file);
                               }
                             });
                           }
@@ -1015,18 +1221,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         // For new events, we need to add the event first to get an ID
                         // But we can't do that without images. So we'll upload with temp ID
                         // and then update the event with the actual ID
-                        // Parse coordinates if provided
-                        Map<String, double>? coordinates;
-                        if (latitudeController.text.isNotEmpty && longitudeController.text.isNotEmpty) {
-                          try {
-                            final lat = double.parse(latitudeController.text);
-                            final lng = double.parse(longitudeController.text);
-                            coordinates = {'latitude': lat, 'longitude': lng};
-                          } catch (e) {
-                            // Invalid coordinates, ignore
-                          }
-                        }
-                        
                         final tempEventData = EventData(
                           type: typeController.text,
                           title: titleController.text,
@@ -1039,13 +1233,12 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                           registrationFormLink: registrationFormLinkController.text.isNotEmpty 
                               ? registrationFormLinkController.text 
                               : null,
-                          locationCoordinates: coordinates,
                         );
                         final docRef = await firestoreProvider.addEventAndGetRef(tempEventData);
                         eventId = docRef.id;
                       }
                       
-                      final uploadedUrls = await storageService.uploadImages(selectedFiles, eventId);
+                      final uploadedUrls = await storageService.uploadImagesFromPlatformFiles(selectedFiles, eventId);
                       finalImageUrls.addAll(uploadedUrls);
                       
                       // Delete images marked for deletion
@@ -1062,18 +1255,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       finalImageUrls = finalImageUrls.sublist(0, 5);
                     }
                     
-                    // Parse coordinates if provided
-                    Map<String, double>? coordinates;
-                    if (latitudeController.text.isNotEmpty && longitudeController.text.isNotEmpty) {
-                      try {
-                        final lat = double.parse(latitudeController.text);
-                        final lng = double.parse(longitudeController.text);
-                        coordinates = {'latitude': lat, 'longitude': lng};
-                      } catch (e) {
-                        // Invalid coordinates, ignore
-                      }
-                    }
-                    
                     final eventData = EventData(
                       id: event?.id,
                       type: typeController.text,
@@ -1087,7 +1268,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       registrationFormLink: registrationFormLinkController.text.isNotEmpty 
                           ? registrationFormLinkController.text 
                           : null,
-                      locationCoordinates: coordinates,
                     );
 
                     if (isEditing && event.id != null) {
@@ -1238,7 +1418,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     final colorOptions = ['#2196F3', '#F44336', '#4CAF50', '#FF9800', '#9C27B0'];
     
     // Image state
-    html.File? selectedFile;
+    PlatformFile? selectedFile;
     String? selectedFileUrl;
     String? existingPosterUrl = announcement?.posterUrl;
     bool deleteExistingPoster = false;
@@ -1267,9 +1447,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Duyuru Türü',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
-                      dropdownColor: const Color(0xFF0A1929),
+                      dropdownColor: const Color(0xFF0A0E17),
                       style: const TextStyle(color: Colors.white),
                       items: typeOptions.map((type) {
                         String displayName;
@@ -1302,40 +1482,65 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                     TextFormField(
                       controller: eventNameController,
                       decoration: const InputDecoration(
-                        labelText: 'Etkinlik Adı',
+                        labelText: 'Duyuru Adı',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
-                          value?.isEmpty ?? true ? 'Etkinlik adı gerekli' : null,
+                          value?.isEmpty ?? true ? 'Duyuru adı gerekli' : null,
                     ),
                     const SizedBox(height: 16),
+                    // Date picker field
                     TextFormField(
                       controller: dateController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tarih',
-                        labelStyle: TextStyle(color: Colors.white70),
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Tarih (Opsiyonel)',
+                        labelStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: const Color(0xFF0A0E17),
+                        suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70),
                       ),
                       style: const TextStyle(color: Colors.white),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Tarih gerekli' : null,
+                      onTap: () async {
+                        final initialDate = _parseDate(dateController.text) ?? DateTime.now();
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: initialDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: Color(0xFF2196F3),
+                                  onPrimary: Colors.white,
+                                  surface: Color(0xFF1A2332),
+                                  onSurface: Colors.white,
+                                ),
+                                dialogBackgroundColor: const Color(0xFF1A2332),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedDate != null) {
+                          dateController.text = _formatDate(pickedDate);
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: addressController,
                       decoration: const InputDecoration(
-                        labelText: 'Adres',
+                        labelText: 'Adres (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Adres gerekli' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -1344,7 +1549,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Açıklama (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       maxLines: 3,
@@ -1356,7 +1561,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Link (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                         hintText: 'https://example.com',
                         hintStyle: TextStyle(color: Colors.white38),
                       ),
@@ -1421,7 +1626,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
-                                    color: const Color(0xFF0A1929),
+                                    color: const Color(0xFF0A0E17),
                                     child: const Icon(
                                       Icons.broken_image,
                                       color: Colors.white54,
@@ -1490,7 +1695,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                               onTap: () {
                                 setState(() {
                                   if (selectedFileUrl != null) {
-                                    html.Url.revokeObjectUrl(selectedFileUrl!);
+                                    _revokeObjectUrl(selectedFileUrl!);
                                   }
                                   selectedFile = null;
                                   selectedFileUrl = null;
@@ -1514,22 +1719,20 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: () {
-                        final input = html.FileUploadInputElement()
-                          ..accept = 'image/*';
-                        input.click();
-                        input.onChange.listen((e) {
-                          final files = input.files;
-                          if (files != null && files.isNotEmpty) {
-                            final file = files[0];
-                            final fileUrl = html.Url.createObjectUrl(file);
-                            setState(() {
-                              selectedFile = file;
-                              selectedFileUrl = fileUrl;
-                              deleteExistingPoster = false;
-                            });
-                          }
-                        });
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                          allowMultiple: false,
+                        );
+                        if (result != null && result.files.isNotEmpty) {
+                          final file = result.files.first;
+                          final fileUrl = _createObjectUrl(file);
+                          setState(() {
+                            selectedFile = file;
+                            selectedFileUrl = fileUrl;
+                            deleteExistingPoster = false;
+                          });
+                        }
                       },
                       icon: const Icon(Icons.add_photo_alternate),
                       label: const Text('Afiş Seç'),
@@ -1717,457 +1920,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     }
   }
 
-  void _showAddHomeSectionDialog(BuildContext context) {
-    _showHomeSectionDialog(context);
-  }
-
-  void _showEditHomeSectionDialog(BuildContext context, HomeSectionData section) {
-    _showHomeSectionDialog(context, section: section);
-  }
-
-  void _showHomeSectionDialog(BuildContext context, {HomeSectionData? section}) {
-    final isEditing = section != null;
-    final formKey = GlobalKey<FormState>();
-    final storageService = StorageService();
-    
-    final titleController = TextEditingController(text: section?.title ?? '');
-    final descriptionController = TextEditingController(text: section?.description ?? '');
-    final orderController = TextEditingController(text: (section?.order ?? 0).toString());
-    
-    bool visible = section?.visible ?? true;
-    
-    // Images state - multiple images support
-    List<html.File> selectedFiles = [];
-    List<String> existingImageUrls = section?.images ?? [];
-    List<String> imageUrlsToDelete = [];
-    Map<html.File, String> fileObjectUrls = {};
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF1A2332),
-          title: Text(
-            isEditing ? 'Bölüm Düzenle' : 'Yeni Bölüm Ekle',
-            style: const TextStyle(color: Colors.white),
-          ),
-          content: SizedBox(
-            width: 600,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Başlık (Opsiyonel)',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Açıklama (Opsiyonel)',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: orderController,
-                      decoration: const InputDecoration(
-                        labelText: 'Sıralama',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                        hintText: '0',
-                        hintStyle: TextStyle(color: Colors.white38),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Sıralama gerekli';
-                        if (int.tryParse(value) == null) return 'Geçerli bir sayı giriniz';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Switch(
-                          value: visible,
-                          onChanged: (value) {
-                            setState(() {
-                              visible = value;
-                            });
-                          },
-                          activeColor: const Color(0xFF2196F3),
-                        ),
-                        const Text(
-                          'Görünür',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Resimler (Birden fazla resim ekleyebilirsiniz)',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    // Existing images
-                    if (existingImageUrls.isNotEmpty)
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: existingImageUrls.asMap().entries.map((entry) {
-                          final imageUrl = entry.value;
-                          if (imageUrlsToDelete.contains(imageUrl)) return const SizedBox.shrink();
-                          return Stack(
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.white54,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: const Color(0xFF0A1929),
-                                        child: const Icon(
-                                          Icons.broken_image,
-                                          color: Colors.white54,
-                                          size: 24,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      imageUrlsToDelete.add(imageUrl);
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    // Selected files preview
-                    if (selectedFiles.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: selectedFiles.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final file = entry.value;
-                            return Stack(
-                              children: [
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.white54,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Image.network(
-                                      fileObjectUrls[file] ?? '',
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: const Color(0xFF0A1929),
-                                          child: const Icon(
-                                            Icons.broken_image,
-                                            color: Colors.white54,
-                                            size: 24,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 4,
-                                  right: 4,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        final objectUrl = fileObjectUrls[file];
-                                        if (objectUrl != null) {
-                                          html.Url.revokeObjectUrl(objectUrl);
-                                          fileObjectUrls.remove(file);
-                                        }
-                                        selectedFiles.removeAt(index);
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        final input = html.FileUploadInputElement()
-                          ..accept = 'image/*'
-                          ..multiple = true;
-                        input.click();
-                        input.onChange.listen((e) {
-                          final files = input.files;
-                          if (files != null && files.isNotEmpty) {
-                            setState(() {
-                              for (var file in files) {
-                                if (!selectedFiles.contains(file)) {
-                                  selectedFiles.add(file);
-                                  final url = html.Url.createObjectUrl(file);
-                                  fileObjectUrls[file] = url;
-                                }
-                              }
-                            });
-                          }
-                        });
-                      },
-                      icon: const Icon(Icons.add_photo_alternate),
-                      label: const Text('Resim Ekle'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white54),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  // Show loading dialog
-                  if (!context.mounted) return;
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-
-                  try {
-                    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
-                    List<String> finalImageUrls = [];
-                    String sectionId = section?.id ?? '';
-                    
-                    // Delete images that were marked for deletion
-                    if (imageUrlsToDelete.isNotEmpty) {
-                      await storageService.deleteImages(imageUrlsToDelete);
-                    }
-                    
-                    // Keep existing images that weren't deleted
-                    finalImageUrls.addAll(
-                      existingImageUrls.where((url) => !imageUrlsToDelete.contains(url))
-                    );
-                    
-                    // Handle new image uploads
-                    if (selectedFiles.isNotEmpty) {
-                      if (isEditing && section.id != null) {
-                        sectionId = section.id!;
-                      } else {
-                        // For new section, create temp section first to get ID
-                        final tempSection = HomeSectionData(
-                          title: titleController.text.isEmpty ? null : titleController.text,
-                          description: descriptionController.text.isEmpty ? null : descriptionController.text,
-                          images: [],
-                          order: int.tryParse(orderController.text) ?? 0,
-                          visible: visible,
-                        );
-                        final docRef = await firestoreProvider.addHomeSectionAndGetRef(tempSection);
-                        sectionId = docRef.id;
-                      }
-                      
-                      // Upload all new images
-                      for (var file in selectedFiles) {
-                        final imageUrl = await storageService.uploadHomeSectionImage(file, sectionId);
-                        finalImageUrls.add(imageUrl);
-                      }
-                    }
-                    
-                    final sectionData = HomeSectionData(
-                      id: section?.id,
-                      title: titleController.text.isEmpty ? null : titleController.text,
-                      description: descriptionController.text.isEmpty ? null : descriptionController.text,
-                      images: finalImageUrls,
-                      order: int.tryParse(orderController.text) ?? 0,
-                      visible: visible,
-                    );
-
-                    if (isEditing && section.id != null) {
-                      await firestoreProvider.updateHomeSection(section.id!, sectionData);
-                    } else {
-                      if (selectedFiles.isNotEmpty && sectionId.isNotEmpty) {
-                        // Update the temp section with the image URLs
-                        await firestoreProvider.updateHomeSection(sectionId, sectionData);
-                      } else {
-                        // No new images, just add/update the section
-                        await firestoreProvider.addHomeSection(sectionData);
-                      }
-                    }
-                    
-                    if (context.mounted) {
-                      Navigator.pop(context); // Close loading dialog
-                      Navigator.pop(context); // Close form dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isEditing
-                                ? 'Bölüm güncellendi'
-                                : 'Bölüm eklendi',
-                          ),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      Navigator.pop(context); // Close loading dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Hata: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2196F3),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(isEditing ? 'Güncelle' : 'Ekle'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _deleteHomeSection(String sectionId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2332),
-        title: const Text(
-          'Bölümü Sil',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Bu bölümü silmek istediğinizden emin misiniz?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('İptal', style: TextStyle(color: Colors.white70)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Sil'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
-        await firestoreProvider.deleteHomeSection(sectionId);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bölüm silindi'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Hata: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   void _showAddAboutSectionDialog(BuildContext context) {
     _showAboutSectionDialog(context);
   }
@@ -2184,12 +1936,11 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     final titleController = TextEditingController(text: section?.title ?? '');
     final subtitleController = TextEditingController(text: section?.subtitle ?? '');
     final descriptionController = TextEditingController(text: section?.description ?? '');
-    final imageUrlController = TextEditingController(text: section?.imageUrl ?? '');
-    final orderController = TextEditingController(text: (section?.order ?? 0).toString());
-    final accentColorController = TextEditingController(text: section?.accentColor ?? '#2196F3');
     
     bool visible = section?.visible ?? true;
     bool isImageRight = section?.isImageRight ?? true;
+    PlatformFile? selectedFile;
+    String? selectedFileUrl;
 
     showDialog(
       context: context,
@@ -2214,7 +1965,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Başlık',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) {
@@ -2229,7 +1980,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Alt Başlık',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) {
@@ -2244,7 +1995,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Açıklama',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       maxLines: 5,
@@ -2254,73 +2005,131 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: imageUrlController,
-                      decoration: const InputDecoration(
-                        labelText: 'Görsel URL',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                        hintText: 'https://example.com/image.jpg',
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Görsel URL gerekli';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: accentColorController,
-                      decoration: const InputDecoration(
-                        labelText: 'Vurgu Rengi (Hex)',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                        hintText: '#2196F3',
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Renk gerekli';
-                        if (!value.startsWith('#') || value.length != 7) {
-                          return 'Geçerli bir hex renk giriniz (örn: #2196F3)';
+                    // Görsel seçimi
+                    Builder(
+                      builder: (context) {
+                        // ignore: unnecessary_null_comparison, unnecessary_nullable_for_final_variable_declarations, unnecessary_non_null_assertion
+                        final imageToShow = selectedFileUrl ?? (isEditing && section != null ? section!.imageUrl ?? '' : '');
+                        if (imageToShow.isEmpty) {
+                          return const SizedBox.shrink();
                         }
-                        return null;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              imageToShow,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 150,
+                                  color: Colors.grey[800],
+                                  child: const Center(
+                                    child: Icon(Icons.error, color: Colors.red),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
                       },
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: orderController,
-                      decoration: const InputDecoration(
-                        labelText: 'Sıralama',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                        hintText: '0',
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                          allowMultiple: false,
+                        );
+                        if (result != null && result.files.isNotEmpty) {
+                          final file = result.files.first;
+                          final fileUrl = _createObjectUrl(file);
+                          setState(() {
+                            selectedFile = file;
+                            selectedFileUrl = fileUrl;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.add_photo_alternate),
+                      label: const Text('Fotoğraf Seç'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white54),
                       ),
-                      style: const TextStyle(color: Colors.white),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Sıralama gerekli';
-                        if (int.tryParse(value) == null) return 'Geçerli bir sayı giriniz';
-                        return null;
-                      },
                     ),
+                    if (selectedFile != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Seçilen: ${selectedFile!.name}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ),
                     const SizedBox(height: 16),
+                    // Görsel konumu
                     Row(
                       children: [
-                        Switch(
-                          value: isImageRight,
-                          onChanged: (value) {
-                            setState(() {
-                              isImageRight = value;
-                            });
-                          },
-                          activeColor: const Color(0xFF2196F3),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                isImageRight = false;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: !isImageRight ? const Color(0xFF2196F3) : const Color(0xFF0A0E17),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: !isImageRight ? const Color(0xFF2196F3) : Colors.white54,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.arrow_back, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Görsel Solda',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
-                        const Text(
-                          'Görsel Sağda',
-                          style: TextStyle(color: Colors.white70),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                isImageRight = true;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: isImageRight ? const Color(0xFF2196F3) : const Color(0xFF0A0E17),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isImageRight ? const Color(0xFF2196F3) : Colors.white54,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'Görsel Sağda',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward, color: Colors.white),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -2367,22 +2176,68 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
                   try {
                     final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+                    final storageService = StorageService();
                     
+                    String? imageUrl = section?.imageUrl;
+                    
+                    // Yeni görsel seçildiyse yükle
+                    if (selectedFile != null) {
+                      if (isEditing && sectionId != null) {
+                        // Düzenleme modunda: görseli yükle ve URL'yi al
+                        imageUrl = await storageService.uploadAboutSectionImage(selectedFile!, sectionId);
+                      } else {
+                        // Yeni bölüm: önce bölümü ekle, sonra görseli yükle
+                        final tempSectionData = AboutSectionData(
+                          title: titleController.text.trim(),
+                          subtitle: subtitleController.text.trim(),
+                          description: descriptionController.text.trim(),
+                          imageUrl: '', // Geçici olarak boş
+                          isImageRight: isImageRight,
+                          accentColor: '#2196F3', // Varsayılan renk
+                          order: 0, // Varsayılan sıralama
+                          visible: visible,
+                        );
+                        final docRef = await firestoreProvider.addAboutSectionAndGetRef(tempSectionData);
+                        imageUrl = await storageService.uploadAboutSectionImage(selectedFile!, docRef.id);
+                        
+                        // Görsel URL'si ile bölümü güncelle
+                        final finalSectionData = tempSectionData.copyWith(
+                          id: docRef.id,
+                          imageUrl: imageUrl,
+                        );
+                        await firestoreProvider.updateAboutSection(docRef.id, finalSectionData);
+                        
+                        if (context.mounted) {
+                          Navigator.pop(context); // Close loading dialog
+                          Navigator.pop(context); // Close form dialog
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Bölüm eklendi'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                    }
+                    
+                    // Düzenleme modunda veya görsel seçilmediyse
                     final sectionData = AboutSectionData(
                       id: section?.id,
                       title: titleController.text.trim(),
                       subtitle: subtitleController.text.trim(),
                       description: descriptionController.text.trim(),
-                      imageUrl: imageUrlController.text.trim(),
+                      imageUrl: imageUrl ?? section?.imageUrl ?? '',
                       isImageRight: isImageRight,
-                      accentColor: accentColorController.text.trim(),
-                      order: int.parse(orderController.text),
+                      accentColor: section?.accentColor ?? '#2196F3', // Mevcut veya varsayılan
+                      order: section?.order ?? 1, // Mevcut veya varsayılan
                       visible: visible,
                     );
 
                     if (isEditing && sectionId != null) {
                       await firestoreProvider.updateAboutSection(sectionId, sectionData);
-                    } else {
+                    } else if (selectedFile == null) {
+                      // Görsel seçilmediyse normal ekleme
                       await firestoreProvider.addAboutSection(sectionData);
                     }
                     
@@ -2429,6 +2284,436 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     try {
       final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
       await firestoreProvider.deleteAboutSection(sectionId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bölüm silindi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Home Section Methods
+  void _showAddHomeSectionDialog(BuildContext context) {
+    _showHomeSectionDialog(context);
+  }
+
+  void _showEditHomeSectionDialog(BuildContext context, HomeSectionData section) {
+    _showHomeSectionDialog(context, section: section);
+  }
+
+  void _showHomeSectionDialog(BuildContext context, {HomeSectionData? section}) {
+    final isEditing = section != null;
+    final sectionId = section?.id;
+    final formKey = GlobalKey<FormState>();
+    
+    final titleController = TextEditingController(text: section?.title ?? '');
+    final descriptionController = TextEditingController(text: section?.description ?? '');
+    final orderController = TextEditingController(text: (section?.order ?? 1).toString());
+    
+    String sectionType = section?.type ?? 'both';
+    bool visible = section?.visible ?? true;
+    List<String> imageUrls = List<String>.from(section?.images ?? []);
+    List<PlatformFile>? selectedFiles;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A2332),
+          title: Text(
+            isEditing ? 'Bölüm Düzenle' : 'Yeni Bölüm Ekle',
+            style: const TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 600,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Section Type Selection
+                    const Text(
+                      'Bölüm Tipi',
+                      style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Yalnızca Görsel', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            value: 'imageOnly',
+                            groupValue: sectionType,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                sectionType = value!;
+                              });
+                            },
+                            activeColor: const Color(0xFF2196F3),
+                            dense: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Yalnızca Yazı', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            value: 'textOnly',
+                            groupValue: sectionType,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                sectionType = value!;
+                              });
+                            },
+                            activeColor: const Color(0xFF2196F3),
+                            dense: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Hem Görsel Hem Yazı', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            value: 'both',
+                            groupValue: sectionType,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                sectionType = value!;
+                              });
+                            },
+                            activeColor: const Color(0xFF2196F3),
+                            dense: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Title (if not imageOnly)
+                    if (sectionType != 'imageOnly')
+                      TextFormField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Başlık (Opsiyonel)',
+                          labelStyle: TextStyle(color: Colors.white70),
+                          filled: true,
+                          fillColor: Color(0xFF0A0E17),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    if (sectionType != 'imageOnly') const SizedBox(height: 16),
+                    // Description (if not imageOnly)
+                    if (sectionType != 'imageOnly')
+                      TextFormField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Açıklama (Opsiyonel)',
+                          labelStyle: TextStyle(color: Colors.white70),
+                          filled: true,
+                          fillColor: Color(0xFF0A0E17),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                        maxLines: 5,
+                      ),
+                    if (sectionType != 'imageOnly') const SizedBox(height: 16),
+                    // Images (if not textOnly)
+                    if (sectionType != 'textOnly') ...[
+                      const Text(
+                        'Görseller',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      // Image URLs
+                      if (imageUrls.isNotEmpty)
+                        ...imageUrls.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final url = entry.value;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A0E17),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    url,
+                                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      imageUrls.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      // Add image URL button
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          final urlController = TextEditingController();
+                          showDialog(
+                            context: context,
+                            builder: (urlContext) => AlertDialog(
+                              backgroundColor: const Color(0xFF1A2332),
+                              title: const Text('Görsel URL Ekle', style: TextStyle(color: Colors.white)),
+                              content: TextField(
+                                controller: urlController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Görsel URL',
+                                  labelStyle: TextStyle(color: Colors.white70),
+                                  filled: true,
+                                  fillColor: Color(0xFF0A0E17),
+                                ),
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(urlContext),
+                                  child: const Text('İptal', style: TextStyle(color: Colors.white70)),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (urlController.text.trim().isNotEmpty) {
+                                      setDialogState(() {
+                                        imageUrls.add(urlController.text.trim());
+                                      });
+                                      Navigator.pop(urlContext);
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2196F3),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Ekle'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.link, size: 18),
+                        label: const Text('URL Ekle', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2196F3),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Upload images button
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.image,
+                              allowMultiple: true,
+                            );
+                            if (result != null && result.files.isNotEmpty) {
+                              setDialogState(() {
+                                selectedFiles = result.files;
+                              });
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Dosya seçme hatası: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.upload_file, size: 18),
+                        label: const Text('Görsel Yükle', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CAF50),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      if (selectedFiles != null && selectedFiles!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '${selectedFiles!.length} dosya seçildi',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
+                    // Order
+                    TextFormField(
+                      controller: orderController,
+                      decoration: const InputDecoration(
+                        labelText: 'Sıralama',
+                        labelStyle: TextStyle(color: Colors.white70),
+                        filled: true,
+                        fillColor: Color(0xFF0A0E17),
+                        hintText: '0',
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Sıralama gerekli';
+                        if (int.tryParse(value) == null) return 'Geçerli bir sayı giriniz';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Visible switch
+                    Row(
+                      children: [
+                        Switch(
+                          value: visible,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              visible = value;
+                            });
+                          },
+                          activeColor: const Color(0xFF2196F3),
+                        ),
+                        const Text(
+                          'Görünür',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('İptal', style: TextStyle(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  // Validate based on section type
+                  if (sectionType == 'imageOnly' && imageUrls.isEmpty && (selectedFiles == null || selectedFiles!.isEmpty)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Yalnızca görsel tipi için en az bir görsel gereklidir'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  if (sectionType == 'textOnly' && titleController.text.trim().isEmpty && descriptionController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Yalnızca yazı tipi için başlık veya açıklama gereklidir'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Show loading dialog
+                  if (!context.mounted) return;
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+
+                  try {
+                    final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+                    final storageService = StorageService();
+                    
+                    // Upload selected files if any
+                    List<String> finalImageUrls = List<String>.from(imageUrls);
+                    if (selectedFiles != null && selectedFiles!.isNotEmpty) {
+                      // Generate a unique ID for this section
+                      final tempId = sectionId ?? DateTime.now().millisecondsSinceEpoch.toString();
+                      final uploadedUrls = await storageService.uploadHomeSectionImages(
+                        selectedFiles!,
+                        tempId,
+                      );
+                      finalImageUrls.addAll(uploadedUrls);
+                    }
+                    
+                    final sectionData = HomeSectionData(
+                      id: section?.id,
+                      title: sectionType == 'imageOnly' ? null : (titleController.text.trim().isEmpty ? null : titleController.text.trim()),
+                      description: sectionType == 'imageOnly' ? null : (descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim()),
+                      images: finalImageUrls,
+                      order: int.parse(orderController.text),
+                      visible: visible,
+                      type: sectionType,
+                    );
+
+                    if (isEditing && sectionId != null) {
+                      await firestoreProvider.updateHomeSection(sectionId, sectionData);
+                    } else {
+                      await firestoreProvider.addHomeSection(sectionData);
+                    }
+                    
+                    if (context.mounted) {
+                      Navigator.pop(context); // Close loading dialog
+                      Navigator.pop(context); // Close form dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isEditing
+                                ? 'Bölüm güncellendi'
+                                : 'Bölüm eklendi',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      Navigator.pop(context); // Close loading dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Hata: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+              ),
+              child: Text(isEditing ? 'Güncelle' : 'Ekle'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteHomeSection(String sectionId) async {
+    try {
+      final firestoreProvider = Provider.of<FirestoreProvider>(context, listen: false);
+      await firestoreProvider.deleteHomeSection(sectionId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -2592,12 +2877,13 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                   crossAxisCount: 4,
                   crossAxisSpacing: 20,
                   mainAxisSpacing: 20,
-                  childAspectRatio: 0.8,
+                  childAspectRatio: 0.65,
                 ),
                 itemCount: sponsors.length,
                 itemBuilder: (context, index) {
-                  return _AdminSponsorCard(
+                  return SponsorCard(
                     sponsor: sponsors[index],
+                    isAdmin: true,
                     onEdit: () => _showEditSponsorDialog(context, sponsors[index]),
                     onDelete: () => _deleteSponsor(sponsors[index].id!),
                   );
@@ -2627,8 +2913,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     final descriptionController = TextEditingController(text: sponsor?.description ?? '');
     final websiteUrlController = TextEditingController(text: sponsor?.websiteUrl ?? '');
     final addressController = TextEditingController(text: sponsor?.address ?? '');
-    String selectedTier = sponsor?.tier ?? 'bronze';
-    final tierOptions = ['platinum', 'gold', 'silver', 'bronze'];
     
     // Logo state
     html.File? selectedFile;
@@ -2658,7 +2942,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Sponsor Adı',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -2671,7 +2955,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Açıklama (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       maxLines: 3,
@@ -2683,76 +2967,51 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Web Sitesi URL (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: addressController,
-                      decoration: const InputDecoration(
-                        labelText: 'Adres (Opsiyonel - Haritada gösterilecek)',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        filled: true,
-                        fillColor: Color(0xFF0A1929),
-                        hintText: 'Örn: Bandırma, Balıkesir',
-                        hintStyle: TextStyle(color: Colors.white38),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Sponsorluk Seviyesi',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
                     Row(
-                      children: tierOptions.map((tier) {
-                        final tierNames = {
-                          'platinum': 'Platin',
-                          'gold': 'Altın',
-                          'silver': 'Gümüş',
-                          'bronze': 'Bronz',
-                        };
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedTier = tier;
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: selectedTier == tier
-                                    ? const Color(0xFF2196F3).withOpacity(0.3)
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: selectedTier == tier
-                                      ? const Color(0xFF2196F3)
-                                      : Colors.white54,
-                                  width: selectedTier == tier ? 2 : 1,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                tierNames[tier] ?? tier,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: selectedTier == tier
-                                      ? Colors.white
-                                      : Colors.white70,
-                                  fontWeight: selectedTier == tier
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: addressController,
+                            decoration: const InputDecoration(
+                              labelText: 'Adres (Opsiyonel - Haritada gösterilecek)',
+                              labelStyle: TextStyle(color: Colors.white70),
+                              filled: true,
+                              fillColor: Color(0xFF0A0E17),
+                              hintText: 'Örn: Bandırma, Balıkesir',
+                              hintStyle: TextStyle(color: Colors.white38),
                             ),
+                            style: const TextStyle(color: Colors.white),
+                            maxLines: 2,
                           ),
-                        );
-                      }).toList(),
+                        ),
+                        const SizedBox(width: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: IconButton(
+                            icon: const Icon(Icons.map, color: Color(0xFF2196F3)),
+                            tooltip: 'Haritadan Seç',
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AddressPickerDialog(
+                                  initialAddress: addressController.text,
+                                  onAddressSelected: (address, latitude, longitude) {
+                                    setState(() {
+                                      addressController.text = address;
+                                    });
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     const Text(
@@ -2888,7 +3147,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       address: addressController.text.trim().isEmpty
                           ? null
                           : addressController.text.trim(),
-                      tier: selectedTier,
                     );
                     
                     if (isEditing && sponsor.id != null) {
@@ -3027,7 +3285,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       labelText: 'Ekip Adı',
                       labelStyle: TextStyle(color: Colors.white70),
                       filled: true,
-                      fillColor: Color(0xFF0A1929),
+                      fillColor: Color(0xFF0A0E17),
                     ),
                     style: const TextStyle(color: Colors.white),
                     validator: (value) =>
@@ -3040,7 +3298,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                       labelText: 'Açıklama (Opsiyonel)',
                       labelStyle: TextStyle(color: Colors.white70),
                       filled: true,
-                      fillColor: Color(0xFF0A1929),
+                      fillColor: Color(0xFF0A0E17),
                     ),
                     style: const TextStyle(color: Colors.white),
                     maxLines: 3,
@@ -3180,7 +3438,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'İsim',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -3193,7 +3451,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Bölüm',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -3206,7 +3464,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Sınıf (Opsiyonel)',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                     ),
@@ -3217,7 +3475,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
                         labelText: 'Ünvan',
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF0A1929),
+                        fillColor: Color(0xFF0A0E17),
                       ),
                       style: const TextStyle(color: Colors.white),
                       validator: (value) =>
@@ -3703,68 +3961,38 @@ class _Header extends StatelessWidget {
               stream: firestoreProvider.getSiteSettingsStream(),
               builder: (context, snapshot) {
                 final logoUrl = snapshot.data?['logoUrl'] ?? '';
-                final logoSize = isMobile ? 40.0 : (isTablet ? 45.0 : 50.0);
+                final logoSize = SizeHelper.isMobile(context) ? 50.0 : (SizeHelper.isTablet(context) ? 60.0 : 70.0);
                 
-                return Row(
-                  children: [
-                    Container(
-                      width: logoSize,
-                      height: logoSize,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2196F3),
-                        borderRadius: BorderRadius.circular(isMobile ? 20 : 25),
+                return Container(
+                  padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 6 : 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularLogoWidget(
+                        size: logoSize,
+                        padding: SizeHelper.isMobile(context) ? 4.0 : 6.0,
+                        logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
                       ),
-                      child: logoUrl.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(isMobile ? 20 : 25),
-                              child: Image.network(
-                                logoUrl,
-                                width: logoSize,
-                                height: logoSize,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Icon(
-                                    Icons.memory,
-                                    color: Colors.white,
-                                    size: isMobile ? 20 : (isTablet ? 24 : 28),
-                                  );
-                                },
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Center(
-                                    child: SizedBox(
-                                      width: logoSize * 0.5,
-                                      height: logoSize * 0.5,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          : Icon(
-                              Icons.memory,
-                              color: Colors.white,
-                              size: isMobile ? 20 : (isTablet ? 24 : 28),
-                            ),
-                    ),
-                    SizedBox(width: isMobile ? 8 : 12),
-                    Text(
-                      isMobile ? 'BMT Admin' : 'BMT - Admin Paneli',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: SizeHelper.clampFontSize(
-                          MediaQuery.of(context).size.width,
-                          16,
-                          20,
-                          24,
+                      SizedBox(width: SizeHelper.isMobile(context) ? 6 : 10),
+                      Text(
+                        'BMT',
+                        style: TextStyle(
+                          color: const Color(0xFF0A0E17),
+                          fontSize: SizeHelper.clampFontSize(
+                            MediaQuery.of(context).size.width,
+                            14,
+                            18,
+                            20,
+                          ),
+                          fontWeight: FontWeight.bold,
                         ),
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             ),
@@ -3973,7 +4201,7 @@ class _AdminEventCard extends StatelessWidget {
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             width: 120,
-                            color: const Color(0xFF0A1929),
+                            color: const Color(0xFF0A0E17),
                             child: const Center(
                               child: Icon(
                                 Icons.broken_image,
@@ -4095,39 +4323,113 @@ class _ImageGalleryDialogState extends State<_ImageGalleryDialog> {
             ),
             // Image viewer
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: widget.images.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: InteractiveViewer(
-                      minScale: 0.5,
-                      maxScale: 3.0,
-                      child: Image.network(
-                        widget.images[index],
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: const Color(0xFF0A1929),
-                            child: const Center(
-                              child: Icon(
-                                Icons.broken_image,
-                                color: Colors.white54,
-                                size: 64,
+              child: Stack(
+                children: [
+                  PageView.builder(
+                    controller: _pageController,
+                    itemCount: widget.images.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 3.0,
+                          child: Image.network(
+                            widget.images[index],
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFF0A0E17),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white54,
+                                    size: 64,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Sol ok butonu (çoklu görsel varsa)
+                  if (widget.images.length > 1)
+                    Positioned(
+                      left: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              final previousIndex = (_currentIndex - 1 + widget.images.length) % widget.images.length;
+                              _pageController.animateToPage(
+                                previousIndex,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.chevron_left,
+                                color: Colors.white,
+                                size: 24,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                },
+                  // Sağ ok butonu (çoklu görsel varsa)
+                  if (widget.images.length > 1)
+                    Positioned(
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              final nextIndex = (_currentIndex + 1) % widget.images.length;
+                              _pageController.animateToPage(
+                                nextIndex,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             // Navigation buttons
@@ -4184,7 +4486,7 @@ class _ImageGalleryDialogState extends State<_ImageGalleryDialog> {
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
-                                    color: const Color(0xFF0A1929),
+                                    color: const Color(0xFF0A0E17),
                                     child: const Icon(
                                       Icons.broken_image,
                                       color: Colors.white54,
@@ -4400,12 +4702,13 @@ class _AdminTeamCard extends StatelessWidget {
                         crossAxisCount: 4,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        childAspectRatio: 0.75,
+                        childAspectRatio: 0.6,
                       ),
                       itemCount: members.length,
                       itemBuilder: (context, index) {
-                        return _AdminTeamMemberCard(
+                        return TeamMemberCard(
                           member: members[index],
+                          isAdmin: true,
                           onEdit: () {
                             final adminState = context.findAncestorStateOfType<_AdminPanelPageState>();
                             adminState?._showEditTeamMemberDialog(context, members[index]);
@@ -4570,7 +4873,7 @@ class _AdminTeamMemberCardState extends State<_AdminTeamMemberCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1929),
+        color: const Color(0xFF0A0E17),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -4747,7 +5050,7 @@ class _AdminAnnouncementCard extends StatelessWidget {
             child: Container(
               height: 150,
               width: double.infinity,
-              color: const Color(0xFF0A1929),
+              color: const Color(0xFF0A0E17),
               child: announcement.posterUrl.isNotEmpty
                   ? _buildPosterImage(
                       announcement.posterUrl,
@@ -4773,21 +5076,41 @@ class _AdminAnnouncementCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: SizeHelper.isMobile(context) ? 10 : 12,
+                      vertical: SizeHelper.isMobile(context) ? 5 : 6,
                     ),
                     decoration: BoxDecoration(
                       color: announcement.color.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      announcement.type,
-                      style: TextStyle(
-                        color: announcement.color,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.campaign,
+                          color: announcement.color,
+                          size: SizeHelper.isMobile(context) ? 14 : 16,
+                        ),
+                        SizedBox(width: SizeHelper.isMobile(context) ? 5 : 6),
+                        Flexible(
+                          child: Text(
+                            announcement.type,
+                            style: TextStyle(
+                              color: announcement.color,
+                              fontSize: SizeHelper.clampFontSize(
+                                MediaQuery.of(context).size.width,
+                                10,
+                                12,
+                                14,
+                              ),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -4899,7 +5222,7 @@ class _AdminSponsorCard extends StatelessWidget {
             child: Container(
               height: 150,
               width: double.infinity,
-              color: const Color(0xFF0A1929),
+              color: const Color(0xFF0A0E17),
               child: sponsor.logoUrl.isNotEmpty
                   ? Image.network(
                       sponsor.logoUrl,
@@ -4932,18 +5255,41 @@ class _AdminSponsorCard extends StatelessWidget {
               children: [
                 // Tier badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: SizeHelper.isMobile(context) ? 10 : 12,
+                    vertical: SizeHelper.isMobile(context) ? 5 : 6,
+                  ),
                   decoration: BoxDecoration(
                     color: sponsor.tierColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    tierNames[sponsor.tier.toLowerCase()] ?? sponsor.tier,
-                    style: TextStyle(
-                      color: sponsor.tierColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.workspace_premium,
+                        color: sponsor.tierColor,
+                        size: SizeHelper.isMobile(context) ? 14 : 16,
+                      ),
+                      SizedBox(width: SizeHelper.isMobile(context) ? 5 : 6),
+                      Flexible(
+                        child: Text(
+                          tierNames[sponsor.tier.toLowerCase()] ?? sponsor.tier,
+                          style: TextStyle(
+                            color: sponsor.tierColor,
+                            fontSize: SizeHelper.clampFontSize(
+                              MediaQuery.of(context).size.width,
+                              10,
+                              12,
+                              14,
+                            ),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -5020,222 +5366,6 @@ class _AdminSponsorCard extends StatelessWidget {
                   ],
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminHomeSectionCard extends StatelessWidget {
-  final HomeSectionData section;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _AdminHomeSectionCard({
-    required this.section,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A2332),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Images preview
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-            ),
-            child: Container(
-              width: 150,
-              height: 150,
-              color: const Color(0xFF0A1929),
-              child: section.images.isNotEmpty
-                  ? (section.images.length == 1
-                      ? Image.network(
-                          section.images[0],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: const Color(0xFF0A1929),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.image_not_supported,
-                                  color: Colors.white54,
-                                  size: 32,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.network(
-                              section.images[0],
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: const Color(0xFF0A1929),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.image_not_supported,
-                                      color: Colors.white54,
-                                      size: 32,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            Container(
-                              color: Colors.black.withOpacity(0.5),
-                              child: Center(
-                                child: Text(
-                                  '+${section.images.length - 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ))
-                  : Container(
-                      color: const Color(0xFF0A1929),
-                      child: const Center(
-                        child: Icon(
-                          Icons.image,
-                          color: Colors.white54,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          section.title ?? '(Başlık yok)',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: section.visible
-                              ? Colors.green.withOpacity(0.2)
-                              : Colors.red.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          section.visible ? 'Görünür' : 'Gizli',
-                          style: TextStyle(
-                            color: section.visible ? Colors.green : Colors.red,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (section.description != null && section.description!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      section.description!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.sort, color: Colors.white70, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Sıralama: ${section.order}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.image, color: Colors.white70, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Resim: ${section.images.length}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: onEdit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2196F3),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: const Text('Düzenle'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: onDelete,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: const Text('Sil'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -5322,14 +5452,14 @@ class _AdminAboutSectionCard extends StatelessWidget {
               child: Container(
                 width: 120,
                 height: 120,
-                color: const Color(0xFF0A1929),
-                child: section.imageUrl.isNotEmpty
+                color: const Color(0xFF0A0E17),
+                child: ((section.imageUrl?.isNotEmpty ?? false))
                     ? Image.network(
-                        section.imageUrl,
+                        section.imageUrl ?? '',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
-                            color: const Color(0xFF0A1929),
+                            color: const Color(0xFF0A0E17),
                             child: const Center(
                               child: Icon(
                                 Icons.image_not_supported,
@@ -5488,6 +5618,373 @@ class _AdminAboutSectionCard extends StatelessWidget {
                       vertical: 8,
                     ),
                   ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminHomeSectionCard extends StatefulWidget {
+  final HomeSectionData section;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _AdminHomeSectionCard({
+    required this.section,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  State<_AdminHomeSectionCard> createState() => _AdminHomeSectionCardState();
+}
+
+class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
+  PageController? _pageController;
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.section.images.isNotEmpty) {
+      _pageController = PageController();
+      // 10 saniyede bir otomatik geçiş
+      _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+        if (mounted && widget.section.images.isNotEmpty && _pageController != null) {
+          final nextIndex = (_currentIndex + 1) % widget.section.images.length;
+          _pageController!.animateToPage(
+            nextIndex,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController?.dispose();
+    super.dispose();
+  }
+
+  String _getTypeDisplayName(String type) {
+    switch (type) {
+      case 'imageOnly':
+        return 'Yalnızca Görsel';
+      case 'textOnly':
+        return 'Yalnızca Yazı';
+      case 'both':
+        return 'Hem Görsel Hem Yazı';
+      default:
+        return type;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2332),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image slider (if has images)
+            if (widget.section.images.isNotEmpty) ...[
+              Container(
+                height: 400,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF0A0E17),
+                ),
+                child: Stack(
+                  children: [
+                    PageView.builder(
+                      controller: _pageController!,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentIndex = index;
+                        });
+                      },
+                      itemCount: widget.section.images.length,
+                      itemBuilder: (context, index) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            widget.section.images[index],
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: const Color(0xFF0A0E17),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: const Color(0xFF2196F3),
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFF0A0E17),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: Colors.white54,
+                                    size: 64,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    // İndikatörler
+                    Positioned(
+                      bottom: 16,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          widget.section.images.length,
+                          (index) => Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _currentIndex == index
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(0.4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Sol ok butonu (çoklu görsel varsa)
+                    if (widget.section.images.length > 1)
+                      Positioned(
+                        left: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                if (_pageController != null && widget.section.images.length > 1) {
+                                  final previousIndex = (_currentIndex - 1 + widget.section.images.length) % widget.section.images.length;
+                                  _pageController!.animateToPage(
+                                    previousIndex,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_left,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    // Sağ ok butonu (çoklu görsel varsa)
+                    if (widget.section.images.length > 1)
+                      Positioned(
+                        right: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                if (_pageController != null && widget.section.images.length > 1) {
+                                  final nextIndex = (_currentIndex + 1) % widget.section.images.length;
+                                  _pageController!.animateToPage(
+                                    nextIndex,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            // Content
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2196F3).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _getTypeDisplayName(widget.section.type),
+                          style: const TextStyle(
+                            color: Color(0xFF2196F3),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (widget.section.title != null && widget.section.title!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.section.title!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                      if (widget.section.description != null && widget.section.description!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.section.description!.length > 100
+                              ? '${widget.section.description!.substring(0, 100)}...'
+                              : widget.section.description!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (widget.section.images.isNotEmpty) ...[
+                            const Icon(
+                              Icons.image,
+                              color: Colors.white70,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${widget.section.images.length} görsel',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Icon(
+                            widget.section.visible ? Icons.visibility : Icons.visibility_off,
+                            color: widget.section.visible ? Colors.green : Colors.red,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            widget.section.visible ? 'Görünür' : 'Gizli',
+                            style: TextStyle(
+                              color: widget.section.visible ? Colors.green : Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Sıra: ${widget.section.order}',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Buttons
+                Column(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: widget.onEdit,
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Düzenle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2196F3),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: widget.onDelete,
+                      icon: const Icon(Icons.delete, size: 18),
+                      label: const Text('Sil'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -5692,7 +6189,7 @@ class _ContactSettingsEditorState extends State<_ContactSettingsEditor> {
                           hintText: 'https://...',
                           hintStyle: const TextStyle(color: Colors.white38),
                           filled: true,
-                          fillColor: const Color(0xFF0A1929),
+                          fillColor: const Color(0xFF0A0E17),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -5858,6 +6355,7 @@ class _SiteSettingsEditor extends StatefulWidget {
 class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
   late TextEditingController _siteNameController;
   late TextEditingController _siteDescriptionController;
+  late TextEditingController _aboutDescriptionController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
@@ -5880,6 +6378,9 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
     );
     _siteDescriptionController = TextEditingController(
       text: widget.settings['siteDescription'] ?? '',
+    );
+    _aboutDescriptionController = TextEditingController(
+      text: widget.settings['aboutDescription'] ?? 'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.',
     );
     _emailController = TextEditingController(
       text: widget.settings['email'] ?? '',
@@ -5924,6 +6425,7 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
   void dispose() {
     _siteNameController.dispose();
     _siteDescriptionController.dispose();
+    _aboutDescriptionController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -6090,6 +6592,47 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
             maxLines: 3,
             decoration: InputDecoration(
               labelText: 'Site Açıklaması',
+              labelStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: const Color(0xFF1A2332),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text(
+            'Hakkımızda Sayfası Açıklaması',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '"Biz Kimiz & Ne Yapıyoruz?" başlığının altında gösterilecek açıklama metni',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _aboutDescriptionController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Hakkımızda Açıklaması',
               labelStyle: const TextStyle(color: Colors.white70),
               filled: true,
               fillColor: const Color(0xFF1A2332),
@@ -6549,6 +7092,7 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
       await firestoreProvider.updateSiteSettings({
         'siteName': _siteNameController.text.trim(),
         'siteDescription': _siteDescriptionController.text.trim(),
+        'aboutDescription': _aboutDescriptionController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
@@ -6589,6 +7133,143 @@ class _SiteSettingsEditorState extends State<_SiteSettingsEditor> {
         setState(() => _isSaving = false);
       }
     }
+  }
+}
+
+class _AboutDescriptionEditor extends StatefulWidget {
+  final String initialDescription;
+  final Future<void> Function(String) onSave;
+
+  const _AboutDescriptionEditor({
+    required this.initialDescription,
+    required this.onSave,
+  });
+
+  @override
+  State<_AboutDescriptionEditor> createState() => _AboutDescriptionEditorState();
+}
+
+class _AboutDescriptionEditorState extends State<_AboutDescriptionEditor> {
+  late TextEditingController _descriptionController;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController = TextEditingController(text: widget.initialDescription);
+  }
+
+  @override
+  void didUpdateWidget(_AboutDescriptionEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialDescription != widget.initialDescription) {
+      _descriptionController.text = widget.initialDescription;
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    if (_isSaving) return;
+    
+    setState(() => _isSaving = true);
+    try {
+      await widget.onSave(_descriptionController.text.trim());
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2332),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Hakkımızda Açıklaması',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '"Biz Kimiz & Ne Yapıyoruz?" başlığının altında gösterilecek açıklama metni',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _descriptionController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Hakkımızda Açıklaması',
+              hintText: 'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor...',
+              labelStyle: const TextStyle(color: Colors.white70),
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: const Color(0xFF0A0E17),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : _handleSave,
+              icon: _isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.save),
+              label: Text(_isSaving ? 'Kaydediliyor...' : 'Kaydet'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                disabledBackgroundColor: Colors.grey[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

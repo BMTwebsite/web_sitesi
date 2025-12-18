@@ -127,7 +127,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
+      backgroundColor: const Color(0xFF0A0E17),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(40),
@@ -198,7 +198,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.person, color: Colors.white70),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -234,7 +234,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -269,7 +269,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                       labelStyle: const TextStyle(color: Colors.white70),
                       prefixIcon: const Icon(Icons.email, color: Colors.white70),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -315,7 +315,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                         },
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -361,7 +361,7 @@ class _AdminRegisterPageState extends State<AdminRegisterPage> {
                         },
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF0A1929),
+                      fillColor: const Color(0xFF0A0E17),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),

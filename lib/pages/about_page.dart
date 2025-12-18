@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
+import 'dart:ui_web' as ui_web show platformViewRegistry;
 import 'package:provider/provider.dart';
 import '../widgets/header.dart';
 import '../widgets/footer.dart';
@@ -131,25 +134,35 @@ class _AboutPageState extends State<AboutPage> {
             return Column(
               key: const ValueKey('About'),
               children: [
-                // Ana açıklama (ilk section'dan alınabilir veya site settings'ten)
-                if (visibleSections.isNotEmpty) ...[
-                  SizedBox(
-                    width: isMobile ? double.infinity : (isTablet ? screenWidth * 0.9 : 600),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0),
-                      child: Text(
-                        'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
-                          height: 1.6,
+                // Ana açıklama (site settings'ten alınır)
+                StreamBuilder<Map<String, dynamic>>(
+                  stream: firestoreProvider.getSiteSettingsStream(),
+                  builder: (context, settingsSnapshot) {
+                    final aboutDescription = settingsSnapshot.data?['aboutDescription'] ?? 
+                        'Teknoloji tutkumuzu akademik bilgiyle birleştiriyor, Bandırma\'dan dünyaya açılan projeler geliştiriyoruz.';
+                    
+                    return Column(
+                      children: [
+                        SizedBox(
+                          width: isMobile ? double.infinity : (isTablet ? screenWidth * 0.9 : 600),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0),
+                            child: Text(
+                              aboutDescription,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
+                                height: 1.6,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: isMobile ? 40 : (isTablet ? 50 : 80)),
-                ],
+                        SizedBox(height: isMobile ? 40 : (isTablet ? 50 : 80)),
+                      ],
+                    );
+                  },
+                ),
                 // Sections
                 ...visibleSections.asMap().entries.map((entry) {
                   final index = entry.key;
@@ -191,7 +204,7 @@ class _InfoSection extends StatelessWidget {
   final String title;
   final String subtitle;
   final String description;
-  final String imageUrl;
+  final String? imageUrl;
   final bool isImageRight;
   final Color accentColor;
 
@@ -199,10 +212,77 @@ class _InfoSection extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.description,
-    required this.imageUrl,
+    this.imageUrl,
     required this.isImageRight,
     required this.accentColor,
   });
+
+  Widget _buildWebImage(String imageUrl, Color accentColor, bool isMobile, BuildContext context) {
+    // Web için önce Image.network dene, hata olursa HTML img kullan
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          color: const Color(0xFF1A2332),
+          child: Center(
+            child: CircularProgressIndicator(
+              color: accentColor,
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        // Image.network başarısız olursa HTML img dene
+        try {
+          final imageId = 'about_img_${imageUrl.hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+          
+          final imgElement = html.ImageElement()
+            ..src = imageUrl
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'cover';
+          
+          ui_web.platformViewRegistry.registerViewFactory(
+            imageId,
+            (int viewId) => imgElement,
+          );
+          
+          return HtmlElementView(viewType: imageId);
+        } catch (e) {
+          // Her iki yöntem de başarısız olursa hata göster
+          return Container(
+            color: const Color(0xFF1A2332),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.image_not_supported,
+                    color: Colors.white54,
+                    size: isMobile ? 48 : 64,
+                  ),
+                  SizedBox(height: isMobile ? 8 : 12),
+                  Text(
+                    'Görsel yüklenemedi',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: isMobile ? 12 : 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -255,70 +335,74 @@ class _InfoSection extends StatelessWidget {
           ),
         ),
       ),
-      SizedBox(width: isMobile ? 0 : (isTablet ? 20 : 40)),
-      Expanded(
-        flex: 1,
-        child: Container(
-          height: isMobile ? 250 : (isTablet ? 300 : 400),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: accentColor.withOpacity(0.2),
-                blurRadius: 40,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  color: const Color(0xFF1A2332),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: accentColor,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: const Color(0xFF1A2332),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_not_supported,
-                          color: Colors.white54,
-                          size: isMobile ? 48 : 64,
-                        ),
-                        SizedBox(height: isMobile ? 8 : 12),
-                        Text(
-                          'Görsel yüklenemedi',
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: isMobile ? 12 : 14,
+      if (imageUrl != null && imageUrl!.isNotEmpty) ...[
+        SizedBox(width: isMobile ? 0 : (isTablet ? 20 : 40)),
+        Expanded(
+          flex: 1,
+          child: Container(
+            height: isMobile ? 250 : (isTablet ? 300 : 400),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.2),
+                  blurRadius: 40,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: kIsWeb
+                  ? _buildWebImage(imageUrl!, accentColor, isMobile, context)
+                  : Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: const Color(0xFF1A2332),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: accentColor,
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
                           ),
-                        ),
-                      ],
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: const Color(0xFF1A2332),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white54,
+                                  size: isMobile ? 48 : 64,
+                                ),
+                                SizedBox(height: isMobile ? 8 : 12),
+                                Text(
+                                  'Görsel yüklenemedi',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: isMobile ? 12 : 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
             ),
           ),
         ),
-      ),
+      ],
     ];
 
     if (!isImageRight) {

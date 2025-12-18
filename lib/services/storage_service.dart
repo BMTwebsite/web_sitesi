@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -19,12 +21,14 @@ class StorageService {
       
       return downloadUrl;
     } catch (e) {
-      print('❌ Image upload error: $e');
+      if (kDebugMode) {
+        print('❌ Image upload error: $e');
+      }
       rethrow;
     }
   }
 
-  /// Upload multiple images and return their download URLs
+  /// Upload multiple images (html.File) and return their download URLs
   Future<List<String>> uploadImages(List<html.File> files, String eventId) async {
     try {
       final List<String> urls = [];
@@ -41,13 +45,111 @@ class StorageService {
     }
   }
 
-  /// Upload announcement poster and return its download URL
-  Future<String> uploadAnnouncementPoster(html.File file, String announcementId) async {
+  /// Upload multiple images (PlatformFile) and return their download URLs
+  Future<List<String>> uploadImagesFromPlatformFiles(List<PlatformFile> files, String eventId) async {
     try {
-      final fileName = 'announcement_${announcementId}_poster.${file.name.split('.').last}';
+      final List<String> urls = [];
+      
+      for (int i = 0; i < files.length; i++) {
+        final url = await uploadImageFromPlatformFile(files[i], eventId, i);
+        urls.add(url);
+      }
+      
+      return urls;
+    } catch (e) {
+      print('❌ Multiple image upload error: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload a single image file (PlatformFile) and return its download URL
+  Future<String> uploadImageFromPlatformFile(PlatformFile file, String eventId, int imageIndex) async {
+    if (!kIsWeb || file.bytes == null) {
+      throw Exception('PlatformFile upload is only supported on web with bytes');
+    }
+    try {
+      final extension = file.extension ?? 'jpeg';
+      final fileName = 'event_${eventId}_image_$imageIndex.$extension';
+      final ref = _storage.ref().child('events/$eventId/$fileName');
+      
+      // Convert PlatformFile bytes to html.Blob
+      final blob = html.Blob([file.bytes!]);
+      final uploadTask = ref.putBlob(blob);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Image upload error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Upload multiple images for home sections
+  Future<List<String>> uploadHomeSectionImages(List<PlatformFile> files, String sectionId) async {
+    try {
+      final List<String> urls = [];
+      
+      for (int i = 0; i < files.length; i++) {
+        final url = await uploadHomeSectionImageWithIndex(files[i], sectionId, i);
+        urls.add(url);
+      }
+      
+      return urls;
+    } catch (e) {
+      print('❌ Home section image upload error: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload a single image for home section (with index)
+  Future<String> uploadHomeSectionImageWithIndex(PlatformFile file, String sectionId, int imageIndex) async {
+    if (!kIsWeb || file.bytes == null) {
+      throw Exception('PlatformFile upload is only supported on web with bytes');
+    }
+    try {
+      final extension = file.extension ?? 'jpeg';
+      final fileName = 'section_${sectionId}_image_$imageIndex.$extension';
+      final ref = _storage.ref().child('home_sections/$sectionId/$fileName');
+      
+      // Convert PlatformFile bytes to html.Blob
+      final blob = html.Blob([file.bytes!]);
+      final uploadTask = ref.putBlob(blob);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Home section image upload error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Upload announcement poster (html.File or PlatformFile) and return its download URL
+  Future<String> uploadAnnouncementPoster(dynamic file, String announcementId) async {
+    // Convert PlatformFile to html.Blob if needed
+    html.Blob blob;
+    String fileName;
+    if (file is PlatformFile) {
+      if (!kIsWeb || file.bytes == null) {
+        throw Exception('PlatformFile upload is only supported on web with bytes');
+      }
+      final extension = file.extension ?? 'jpeg';
+      fileName = 'announcement_${announcementId}_poster.$extension';
+      blob = html.Blob([file.bytes!]);
+    } else {
+      fileName = 'announcement_${announcementId}_poster.${file.name.split('.').last}';
+      blob = file as html.File;
+    }
+    
+    try {
       final storagePath = 'announcements/$announcementId/$fileName';
       print('📤 Storage path: $storagePath');
-      print('📤 File name: ${file.name}, size: ${file.size} bytes');
+      print('📤 File name: $fileName');
       
       final ref = _storage.ref().child(storagePath);
       
@@ -55,7 +157,7 @@ class StorageService {
       print('📤 Storage bucket: ${_storage.app.options.storageBucket}');
       print('📤 Storage ref full path: ${ref.fullPath}');
       
-      final uploadTask = ref.putBlob(file);
+      final uploadTask = ref.putBlob(blob);
       
       // Check initial state
       print('📤 Upload task oluşturuldu. Initial state: ${uploadTask.snapshot.state}');
@@ -68,20 +170,28 @@ class StorageService {
             final progress = taskSnapshot.totalBytes > 0 
                 ? (taskSnapshot.bytesTransferred / taskSnapshot.totalBytes) * 100
                 : 0.0;
-            print('📊 Upload progress: ${progress.toStringAsFixed(1)}% (${taskSnapshot.bytesTransferred}/${taskSnapshot.totalBytes} bytes)');
-            print('📊 Upload state: ${taskSnapshot.state}');
+            if (kDebugMode) {
+              print('📊 Upload progress: ${progress.toStringAsFixed(1)}% (${taskSnapshot.bytesTransferred}/${taskSnapshot.totalBytes} bytes)');
+              print('📊 Upload state: ${taskSnapshot.state}');
+            }
             
             // Check for errors in state
             if (taskSnapshot.state == TaskState.error) {
-              print('❌ Upload task error state detected!');
+              if (kDebugMode) {
+                print('❌ Upload task error state detected!');
+              }
             }
           },
           onError: (error) {
-            print('❌ Upload progress listener error: $error');
+            if (kDebugMode) {
+              print('❌ Upload progress listener error: $error');
+            }
           },
         );
       } catch (e) {
-        print('⚠️ Progress listener oluşturulamadı: $e');
+        if (kDebugMode) {
+          print('⚠️ Progress listener oluşturulamadı: $e');
+        }
       }
       
       // Wait for upload with timeout and better error handling
@@ -100,7 +210,9 @@ class StorageService {
         progressSubscription?.cancel();
       } catch (timeoutError) {
         progressSubscription?.cancel();
-        print('❌ Upload timeout hatası: $timeoutError');
+        if (kDebugMode) {
+          print('❌ Upload timeout hatası: $timeoutError');
+        }
         rethrow;
       }
       
@@ -113,16 +225,22 @@ class StorageService {
         downloadUrl = await snapshot.ref.getDownloadURL().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print('❌ Download URL alma timeout!');
+            if (kDebugMode) {
+              print('❌ Download URL alma timeout!');
+            }
             throw Exception('Afiş URL\'si alınamadı. Lütfen tekrar deneyin.');
           },
         );
       } catch (urlError) {
-        print('❌ Download URL alma hatası: $urlError');
+        if (kDebugMode) {
+          print('❌ Download URL alma hatası: $urlError');
+        }
         rethrow;
       }
       
-      print('✅ Download URL alındı: $downloadUrl');
+      if (kDebugMode) {
+        print('✅ Download URL alındı: $downloadUrl');
+      }
       
       if (downloadUrl.isEmpty) {
         throw Exception('Download URL boş döndü');
@@ -209,20 +327,28 @@ class StorageService {
             final progress = taskSnapshot.totalBytes > 0 
                 ? (taskSnapshot.bytesTransferred / taskSnapshot.totalBytes) * 100
                 : 0.0;
-            print('📊 Upload progress: ${progress.toStringAsFixed(1)}% (${taskSnapshot.bytesTransferred}/${taskSnapshot.totalBytes} bytes)');
-            print('📊 Upload state: ${taskSnapshot.state}');
+            if (kDebugMode) {
+              print('📊 Upload progress: ${progress.toStringAsFixed(1)}% (${taskSnapshot.bytesTransferred}/${taskSnapshot.totalBytes} bytes)');
+              print('📊 Upload state: ${taskSnapshot.state}');
+            }
             
             // Check for errors in state
             if (taskSnapshot.state == TaskState.error) {
-              print('❌ Upload task error state detected!');
+              if (kDebugMode) {
+                print('❌ Upload task error state detected!');
+              }
             }
           },
           onError: (error) {
-            print('❌ Upload progress listener error: $error');
+            if (kDebugMode) {
+              print('❌ Upload progress listener error: $error');
+            }
           },
         );
       } catch (e) {
-        print('⚠️ Progress listener oluşturulamadı: $e');
+        if (kDebugMode) {
+          print('⚠️ Progress listener oluşturulamadı: $e');
+        }
       }
       
       // Wait for upload with timeout and better error handling
@@ -241,7 +367,9 @@ class StorageService {
         progressSubscription?.cancel();
       } catch (timeoutError) {
         progressSubscription?.cancel();
-        print('❌ Upload timeout hatası: $timeoutError');
+        if (kDebugMode) {
+          print('❌ Upload timeout hatası: $timeoutError');
+        }
         rethrow;
       }
       
@@ -254,16 +382,22 @@ class StorageService {
         downloadUrl = await snapshot.ref.getDownloadURL().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print('❌ Download URL alma timeout!');
+            if (kDebugMode) {
+              print('❌ Download URL alma timeout!');
+            }
             throw Exception('Fotoğraf URL\'si alınamadı. Lütfen tekrar deneyin.');
           },
         );
       } catch (urlError) {
-        print('❌ Download URL alma hatası: $urlError');
+        if (kDebugMode) {
+          print('❌ Download URL alma hatası: $urlError');
+        }
         rethrow;
       }
       
-      print('✅ Download URL alındı: $downloadUrl');
+      if (kDebugMode) {
+        print('✅ Download URL alındı: $downloadUrl');
+      }
       
       if (downloadUrl.isEmpty) {
         throw Exception('Download URL boş döndü');
@@ -378,7 +512,9 @@ class StorageService {
         },
       );
       
-      print('✅ Download URL alındı: $downloadUrl');
+      if (kDebugMode) {
+        print('✅ Download URL alındı: $downloadUrl');
+      }
       
       if (downloadUrl.isEmpty) {
         throw Exception('Download URL boş döndü');
@@ -418,13 +554,27 @@ class StorageService {
     }
   }
 
-  /// Upload home section image and return its download URL
-  Future<String> uploadHomeSectionImage(html.File file, String sectionId) async {
+  /// Upload home section image (html.File or PlatformFile) and return its download URL
+  Future<String> uploadHomeSectionImage(dynamic file, String sectionId) async {
+    // Convert PlatformFile to html.Blob if needed
+    html.Blob blob;
+    String fileName;
+    if (file is PlatformFile) {
+      if (!kIsWeb || file.bytes == null) {
+        throw Exception('PlatformFile upload is only supported on web with bytes');
+      }
+      final extension = file.extension ?? 'jpeg';
+      fileName = 'section_${sectionId}_image.$extension';
+      blob = html.Blob([file.bytes!]);
+    } else {
+      fileName = 'section_${sectionId}_image.${file.name.split('.').last}';
+      blob = file as html.File;
+    }
+    
     try {
-      final fileName = 'section_${sectionId}_image.${file.name.split('.').last}';
       final storagePath = 'home_sections/$sectionId/$fileName';
       print('📤 Storage path: $storagePath');
-      print('📤 File name: ${file.name}, size: ${file.size} bytes');
+      print('📤 File name: $fileName');
       
       final ref = _storage.ref().child(storagePath);
       
@@ -432,7 +582,7 @@ class StorageService {
       print('📤 Storage bucket: ${_storage.app.options.storageBucket}');
       print('📤 Storage ref full path: ${ref.fullPath}');
       
-      final uploadTask = ref.putBlob(file);
+      final uploadTask = ref.putBlob(blob);
       
       print('📤 Upload task oluşturuldu. Initial state: ${uploadTask.snapshot.state}');
       
@@ -454,7 +604,9 @@ class StorageService {
         },
       );
       
-      print('✅ Download URL alındı: $downloadUrl');
+      if (kDebugMode) {
+        print('✅ Download URL alındı: $downloadUrl');
+      }
       
       if (downloadUrl.isEmpty) {
         throw Exception('Download URL boş döndü');
@@ -474,6 +626,98 @@ class StorageService {
           case 'unauthorized':
           case 'permission-denied':
             userFriendlyMessage = 'Firebase Storage izin hatası. Firebase Console\'da Storage Rules\'ı kontrol edin. home_sections klasörü için yazma izni verilmelidir.';
+            break;
+          case 'unauthenticated':
+            userFriendlyMessage = 'Kimlik doğrulama hatası. Lütfen tekrar giriş yapın.';
+            break;
+          case 'object-not-found':
+            userFriendlyMessage = 'Dosya bulunamadı.';
+            break;
+          case 'quota-exceeded':
+            userFriendlyMessage = 'Storage kotası aşıldı.';
+            break;
+          default:
+            userFriendlyMessage = 'Firebase Storage hatası: ${e.message ?? e.code}';
+        }
+        throw Exception(userFriendlyMessage);
+      }
+      
+      rethrow;
+    }
+  }
+
+  /// Upload about section image and return its download URL
+  Future<String> uploadAboutSectionImage(dynamic file, String sectionId) async {
+    // Convert PlatformFile to html.Blob if needed
+    html.Blob blob;
+    String fileName;
+    if (file is PlatformFile) {
+      if (!kIsWeb || file.bytes == null) {
+        throw Exception('PlatformFile upload is only supported on web with bytes');
+      }
+      final extension = file.extension ?? 'jpeg';
+      fileName = 'section_${sectionId}_image.$extension';
+      blob = html.Blob([file.bytes!]);
+    } else {
+      fileName = 'section_${sectionId}_image.${file.name.split('.').last}';
+      blob = file as html.File;
+    }
+    
+    try {
+      final storagePath = 'about_sections/$sectionId/$fileName';
+      print('📤 Storage path: $storagePath');
+      print('📤 File name: $fileName');
+      
+      final ref = _storage.ref().child(storagePath);
+      
+      print('📤 Upload başlatılıyor...');
+      print('📤 Storage bucket: ${_storage.app.options.storageBucket}');
+      print('📤 Storage ref full path: ${ref.fullPath}');
+      
+      final uploadTask = ref.putBlob(blob);
+      
+      print('📤 Upload task oluşturuldu. Initial state: ${uploadTask.snapshot.state}');
+      
+      final snapshot = await uploadTask.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print('❌ Upload timeout! 30 saniye içinde tamamlanamadı.');
+          throw Exception('Resim yükleme işlemi zaman aşımına uğradı. Firebase Storage Rules\'ı kontrol edin ve internet bağlantınızı kontrol edin.');
+        },
+      );
+      
+      print('✅ Upload tamamlandı. Snapshot state: ${snapshot.state}');
+      
+      final downloadUrl = await snapshot.ref.getDownloadURL().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('❌ Download URL alma timeout!');
+          throw Exception('Resim URL\'si alınamadı. Lütfen tekrar deneyin.');
+        },
+      );
+      
+      if (kDebugMode) {
+        print('✅ Download URL alındı: $downloadUrl');
+      }
+      
+      if (downloadUrl.isEmpty) {
+        throw Exception('Download URL boş döndü');
+      }
+      
+      return downloadUrl;
+    } catch (e) {
+      print('❌ About section image upload error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      
+      if (e is FirebaseException) {
+        print('❌ Firebase error code: ${e.code}');
+        print('❌ Firebase error message: ${e.message}');
+        
+        String userFriendlyMessage;
+        switch (e.code) {
+          case 'unauthorized':
+          case 'permission-denied':
+            userFriendlyMessage = 'Firebase Storage izin hatası. Firebase Console\'da Storage Rules\'ı kontrol edin. about_sections klasörü için yazma izni verilmelidir.';
             break;
           case 'unauthenticated':
             userFriendlyMessage = 'Kimlik doğrulama hatası. Lütfen tekrar giriş yapın.';

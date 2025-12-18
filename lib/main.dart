@@ -1,10 +1,11 @@
-import 'dart:ui';
+// Optimizasyon: Sadece gerekli import'lar
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'secrets.dart';
 import 'dart:html' as html;
+// Sayfalar - Flutter zaten route edildiğinde render eder
 import 'pages/home_page.dart';
 import 'pages/events_page.dart';
 import 'pages/announcements_page.dart';
@@ -23,17 +24,21 @@ import 'utils/custom_page_route.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Global hata yakalama
+  // Global hata yakalama - sadece debug modda log
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    print('❌ Flutter Error: ${details.exception}');
-    print('📚 Stack: ${details.stack}');
+    if (kDebugMode) {
+      print('❌ Flutter Error: ${details.exception}');
+      print('📚 Stack: ${details.stack}');
+    }
   };
   
-  // Platform hatalarını yakala
+  // Platform hatalarını yakala - sadece debug modda log
   PlatformDispatcher.instance.onError = (error, stack) {
-    print('❌ Platform Error: $error');
-    print('📚 Stack: $stack');
+    if (kDebugMode) {
+      print('❌ Platform Error: $error');
+      print('📚 Stack: $stack');
+    }
     return true;
   };
   
@@ -41,11 +46,7 @@ void main() async {
   String? firebaseError;
   
   try {
-    print('🔄 Firebase başlatılıyor...');
-    print('📋 Firebase Config:');
-    print('   - Project ID: ${Secrets.firebaseProjectId}');
-    print('   - Auth Domain: ${Secrets.firebaseAuthDomain}');
-    
+    // Firebase başlatma - production'da log yok
     await Firebase.initializeApp(
       options: FirebaseOptions(
         apiKey: Secrets.firebaseApiKey,
@@ -58,16 +59,15 @@ void main() async {
     ).timeout(
       const Duration(seconds: 10),
       onTimeout: () {
-        print('⏱️ Firebase başlatma timeout oldu (10 saniye)');
-        print('⚠️ İnternet bağlantınızı kontrol edin');
         throw 'Firebase başlatma zaman aşımına uğradı. İnternet bağlantınızı kontrol edin.';
       },
     );
     firebaseInitialized = true;
-    print('✅ Firebase başarıyla başlatıldı');
   } catch (e, stackTrace) {
-    print('❌ Firebase başlatma hatası: $e');
-    print('📚 Stack trace: $stackTrace');
+    if (kDebugMode) {
+      print('❌ Firebase başlatma hatası: $e');
+      print('📚 Stack trace: $stackTrace');
+    }
     firebaseInitialized = false;
     firebaseError = e.toString();
     // Hata olsa bile uygulamayı çalıştırmaya devam et
@@ -77,28 +77,29 @@ void main() async {
 }
 
 // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
+// Optimizasyon: Sadece gerekli durumlarda kontrol et
 Widget? _getHomeWidget() {
   if (!kIsWeb) return null;
   
   try {
     final hash = html.window.location.hash;
-    print('🔍 _getHomeWidget - Hash kontrolü: $hash');
     
     if (hash.contains('/admin-verify') && hash.contains('token=')) {
-      print('✅ _getHomeWidget - Admin verify linki tespit edildi');
       final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
       if (tokenMatch != null && tokenMatch.group(1) != null) {
         final token = Uri.decodeComponent(tokenMatch.group(1)!);
-        print('✅ _getHomeWidget - Token bulundu, AdminVerifyPage döndürülüyor: $token');
         return AdminVerifyPage(token: token);
       }
     }
   } catch (e) {
-    print('⚠️ _getHomeWidget hash kontrolü hatası: $e');
+    if (kDebugMode) {
+      print('⚠️ _getHomeWidget hash kontrolü hatası: $e');
+    }
   }
-  
+
   return null;
 }
+
 
 class BMTApp extends StatelessWidget {
   final bool firebaseInitialized;
@@ -111,7 +112,7 @@ class BMTApp extends StatelessWidget {
     // Firebase başlatılmadıysa hata göster
     if (!firebaseInitialized) {
       return MaterialApp(
-        title: 'BMT Web Sitesi',
+        title: 'Bilgisayar Mühendisliği Topluluğu',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -196,7 +197,7 @@ class BMTApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FirestoreProvider()),
       ],
       child: MaterialApp(
-        title: 'BMT Web Sitesi',
+        title: 'Bilgisayar Mühendisliği Topluluğu',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -233,34 +234,27 @@ class BMTApp extends StatelessWidget {
               ),
             );
           } catch (e) {
-            print('❌ Builder hatası: $e');
+            if (kDebugMode) {
+              print('❌ Builder hatası: $e');
+            }
             return child ?? const SizedBox();
           }
         },
         // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
         home: kIsWeb ? (_getHomeWidget() ?? const HomePage()) : const HomePage(),
         onGenerateRoute: (settings) {
-          print('🔍 onGenerateRoute çağrıldı: ${settings.name}');
-          
-          // Web'de hash routing kontrolü
+          // Web'de hash routing kontrolü - optimizasyon: sadece gerekli durumlarda
           if (kIsWeb) {
             try {
               final hash = html.window.location.hash;
-              final fullUrl = html.window.location.href;
-              
-              print('🔍 onGenerateRoute - Hash: $hash');
-              print('🔍 onGenerateRoute - Full URL: $fullUrl');
               
               // Eğer hash'te admin-verify varsa
               if (hash.contains('/admin-verify') && hash.contains('token=')) {
-                print('✅ onGenerateRoute - Admin verify linki tespit edildi');
-                
                 // Token'ı parse et
                 String? token;
                 final tokenMatch = RegExp(r'token=([^&#]+)').firstMatch(hash);
                 if (tokenMatch != null && tokenMatch.group(1) != null) {
                   token = Uri.decodeComponent(tokenMatch.group(1)!);
-                  print('✅ onGenerateRoute - Token bulundu: $token');
                   
                   return CustomPageRoute(
                     settings: settings,
@@ -269,7 +263,9 @@ class BMTApp extends StatelessWidget {
                 }
               }
             } catch (e) {
-              print('⚠️ onGenerateRoute hash kontrolü hatası: $e');
+              if (kDebugMode) {
+                print('⚠️ onGenerateRoute hash kontrolü hatası: $e');
+              }
             }
           }
           
@@ -285,7 +281,7 @@ class BMTApp extends StatelessWidget {
             );
           }
           
-          // Normal route'lar için custom transition kullan
+          // Normal route'lar için lazy loading - sayfalar sadece ihtiyaç duyulduğunda yüklenecek
           Widget? page;
           switch (settings.name) {
             case '/home':
@@ -320,11 +316,10 @@ class BMTApp extends StatelessWidget {
               page = const AdminPanelPage();
               break;
             case '/admin-verify':
-              // Hash routing için query parametrelerini al
+              // Hash routing için query parametrelerini al - optimizasyon: sadece gerekli kontroller
               String? token;
               if (kIsWeb) {
                 try {
-                  final fullUrl = html.window.location.href;
                   final hash = html.window.location.hash;
                   final search = html.window.location.search ?? '';
                   
@@ -337,7 +332,9 @@ class BMTApp extends StatelessWidget {
                           final queryUri = Uri.parse('?${hashParts[1]}');
                           token = queryUri.queryParameters['token'];
                         } catch (e) {
-                          print('⚠️ Hash query parse hatası: $e');
+                          if (kDebugMode) {
+                            print('⚠️ Hash query parse hatası: $e');
+                          }
                         }
                       }
                     }
@@ -356,13 +353,16 @@ class BMTApp extends StatelessWidget {
                       final searchUri = Uri.parse(search);
                       token = searchUri.queryParameters['token'];
                     } catch (e) {
-                      print('⚠️ Search parse hatası: $e');
+                      if (kDebugMode) {
+                        print('⚠️ Search parse hatası: $e');
+                      }
                     }
                   }
                   
                   // Yöntem 3: Full URL'den parse et
                   if (token == null || token.isEmpty) {
                     try {
+                      final fullUrl = html.window.location.href;
                       final fullUri = Uri.parse(fullUrl);
                       token = fullUri.queryParameters['token'];
                       
@@ -379,7 +379,9 @@ class BMTApp extends StatelessWidget {
                         }
                       }
                     } catch (e) {
-                      print('⚠️ Full URL parse hatası: $e');
+                      if (kDebugMode) {
+                        print('⚠️ Full URL parse hatası: $e');
+                      }
                     }
                   }
                   
@@ -388,22 +390,22 @@ class BMTApp extends StatelessWidget {
                     token = Uri.base.queryParameters['token'];
                   }
                 } catch (e, stackTrace) {
-                  print('❌ Query parameter parse hatası: $e');
-                  print('📚 Stack trace: $stackTrace');
+                  if (kDebugMode) {
+                    print('❌ Query parameter parse hatası: $e');
+                    print('📚 Stack trace: $stackTrace');
+                  }
                   try {
                     token = Uri.base.queryParameters['token'];
                   } catch (e2) {
-                    print('❌ Uri.base parse hatası: $e2');
+                    if (kDebugMode) {
+                      print('❌ Uri.base parse hatası: $e2');
+                    }
                   }
                 }
               } else {
                 token = Uri.base.queryParameters['token'];
               }
               
-              print('✅ Final token: $token');
-              if (token == null || token.isEmpty) {
-                print('⚠️ Token bulunamadı! URL formatını kontrol edin.');
-              }
               page = AdminVerifyPage(token: token);
               break;
           }

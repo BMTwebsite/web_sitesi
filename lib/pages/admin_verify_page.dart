@@ -219,7 +219,7 @@ class _AdminVerifyPageState extends State<AdminVerifyPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1929),
+      backgroundColor: const Color(0xFF0A0E17),
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 500),

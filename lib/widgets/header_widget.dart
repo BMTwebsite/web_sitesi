@@ -92,12 +92,12 @@ class _HeaderWidgetState extends State<HeaderWidget> {
               ),
               const SizedBox(width: 30),
               _NavItem(
-                text: 'Hakkımızda',
-                route: '/about',
-                isActive: _currentRoute == '/about',
+                text: 'Duyurular',
+                route: '/announcements',
+                isActive: _currentRoute == '/announcements',
                 onTap: () {
-                  setState(() => _currentRoute = '/about');
-                  // TODO: Implement about page
+                  setState(() => _currentRoute = '/announcements');
+                  Navigator.pushNamed(context, '/announcements');
                 },
               ),
               const SizedBox(width: 30),
@@ -117,7 +117,7 @@ class _HeaderWidgetState extends State<HeaderWidget> {
                 isActive: _currentRoute == '/team',
                 onTap: () {
                   setState(() => _currentRoute = '/team');
-                  // TODO: Implement team page
+                  Navigator.pushNamed(context, '/team');
                 },
               ),
               const SizedBox(width: 30),
@@ -127,7 +127,17 @@ class _HeaderWidgetState extends State<HeaderWidget> {
                 isActive: _currentRoute == '/sponsor',
                 onTap: () {
                   setState(() => _currentRoute = '/sponsor');
-                  // TODO: Implement sponsor page
+                  Navigator.pushNamed(context, '/sponsor');
+                },
+              ),
+              const SizedBox(width: 30),
+              _NavItem(
+                text: 'Hakkımızda',
+                route: '/about',
+                isActive: _currentRoute == '/about',
+                onTap: () {
+                  setState(() => _currentRoute = '/about');
+                  Navigator.pushNamed(context, '/about');
                 },
               ),
               const SizedBox(width: 30),
@@ -137,7 +147,7 @@ class _HeaderWidgetState extends State<HeaderWidget> {
                 isActive: _currentRoute == '/contact',
                 onTap: () {
                   setState(() => _currentRoute = '/contact');
-                  // TODO: Implement contact page
+                  Navigator.pushNamed(context, '/contact');
                 },
               ),
             ],

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/firestore_provider.dart';
 import '../utils/size_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'circular_logo_widget.dart';
 
 class Footer extends StatelessWidget {
   const Footer({super.key});
@@ -40,6 +41,7 @@ class _FooterContent extends StatelessWidget {
         final phone = siteSettings['phone'] ?? '';
         final address = siteSettings['address'] ?? '';
         final copyright = siteSettings['copyright'] ?? '';
+        final logoUrl = siteSettings['logoUrl'] ?? '';
         
         return StreamBuilder<Map<String, dynamic>>(
           stream: firestoreProvider.getContactSettingsStream(),
@@ -59,25 +61,17 @@ class _FooterContent extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2196F3),
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                child: const Icon(
-                                  Icons.memory,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
+                              CircularLogoWidget(
+                                size: SizeHelper.isMobile(context) ? 50.0 : (SizeHelper.isTablet(context) ? 55.0 : 60.0),
+                                padding: SizeHelper.isMobile(context) ? 4.0 : 6.0,
+                                logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
                               ),
                               const SizedBox(width: 12),
                               Flexible(
                                 child: Text(
-                                  siteName.isNotEmpty ? siteName : 'Site Adı',
+                                  siteName.isNotEmpty ? siteName : 'Bilgisayar Mühendisliği Topluluğu',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,

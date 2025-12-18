@@ -19,6 +19,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Bilgisayar Mühendisliği Topluluğu - Teknoloji ve inovasyonun buluşma noktası">
+  <!-- Performance: Viewport meta tag for mobile optimization -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -30,11 +32,13 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <!-- Google Fonts - Roboto (optional, fallback to system fonts if fails) -->
+  <!-- Performance: Preconnect to font domains for faster loading -->
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Performance: Font loading with display=swap for better perceived performance -->
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" onerror="console.warn('Roboto font yüklenemedi, sistem fontları kullanılacak')">
 
-  <title>BMT Web Sitesi</title>
+  <title>Bilgisayar Mühendisliği Topluluğu</title>
 
   <link rel="manifest" href="manifest.json">
   
@@ -114,13 +118,14 @@
   </style>
   
   <script>
+    // Performance: Optimize loading screen removal
     // Flutter yüklendikten sonra loading ekranını kaldır
     window.addEventListener('flutter-first-frame', function() {
       const loading = document.getElementById('loading');
       if (loading) {
         loading.style.display = 'none';
       }
-    });
+    }, { once: true }); // once: true ile event listener'ı sadece bir kez çalıştır
     
     // Hata durumunda da loading'i kaldır
     window.addEventListener('error', function() {
@@ -128,9 +133,9 @@
       if (loading) {
         loading.style.display = 'none';
       }
-    });
+    }, { once: true });
     
-    // 30 saniye sonra loading'i kaldır (timeout)
+    // 30 saniye sonra loading'i kaldır (timeout) - fallback
     setTimeout(function() {
       const loading = document.getElementById('loading');
       if (loading) {
@@ -139,6 +144,7 @@
     }, 30000);
   </script>
   
+  <!-- Performance: Async script loading for non-blocking execution -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
