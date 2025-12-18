@@ -29,12 +29,14 @@ class Header extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo - tıklanınca admin girişi açılır
+              // Logo ve Admin Butonu - tıklanınca admin girişi açılır
               Consumer<FirestoreProvider>(
                 builder: (context, firestoreProvider, _) => StreamBuilder<Map<String, dynamic>>(
                   stream: firestoreProvider.getSiteSettingsStream(),
@@ -42,42 +44,96 @@ class Header extends StatelessWidget {
                     final logoUrl = snapshot.data?['logoUrl'] ?? '';
                     final logoSize = SizeHelper.isMobile(context) ? 50.0 : (SizeHelper.isTablet(context) ? 60.0 : 70.0);
                     
-                    return GestureDetector(
-                      onTap: () {
-                        // Logo'ya tıklanınca admin giriş sayfasına yönlendir
-                        Navigator.pushNamed(context, '/admin-login');
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 6 : 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularLogoWidget(
-                              size: logoSize,
-                              padding: SizeHelper.isMobile(context) ? 4.0 : 6.0,
-                              logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            // Logo'ya tıklanınca admin giriş sayfasına yönlendir
+                            Navigator.pushNamed(context, '/admin-login');
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 6 : 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            SizedBox(width: SizeHelper.isMobile(context) ? 6 : 10),
-                            Text(
-                              'BMT',
-                              style: TextStyle(
-                                color: const Color(0xFF0A1929),
-                                fontSize: SizeHelper.clampFontSize(
-                                  MediaQuery.of(context).size.width,
-                                  14,
-                                  18,
-                                  20,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircularLogoWidget(
+                                  size: logoSize,
+                                  padding: SizeHelper.isMobile(context) ? 4.0 : 6.0,
+                                  logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
                                 ),
-                                fontWeight: FontWeight.bold,
-                              ),
+                                SizedBox(width: SizeHelper.isMobile(context) ? 6 : 10),
+                                Text(
+                                  'BMT',
+                                  style: TextStyle(
+                                    color: const Color(0xFF0A1929),
+                                    fontSize: SizeHelper.clampFontSize(
+                                      MediaQuery.of(context).size.width,
+                                      14,
+                                      18,
+                                      20,
+                                    ),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        // Admin Paneli Butonu - Logo'nun yanında
+                        StreamBuilder(
+                          stream: AuthService().authStateChanges,
+                          builder: (context, authSnapshot) {
+                            if (authSnapshot.hasData) {
+                              return FutureBuilder<bool>(
+                                future: AuthService().isAdmin(),
+                                builder: (context, adminSnapshot) {
+                                  final isAdmin = adminSnapshot.data ?? false;
+                                  final screenWidth = MediaQuery.of(context).size.width;
+                                  final isSmallScreen = screenWidth < 768;
+                                  
+                                  if (isAdmin) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        left: SizeHelper.isMobile(context) ? 8 : 12,
+                                      ),
+                                      child: OutlinedButton.icon(
+                                        onPressed: () => Navigator.pushNamed(context, '/admin-panel'),
+                                        icon: Icon(
+                                          Icons.admin_panel_settings,
+                                          size: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
+                                        ),
+                                        label: Text(
+                                          'Admin Paneli',
+                                          style: TextStyle(
+                                            fontSize: SizeHelper.clampFontSize(screenWidth, 11, 13, 15),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: const BorderSide(color: Color(0xFF2196F3)),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: isSmallScreen ? 8 : 16,
+                                            vertical: isSmallScreen ? 6 : 8,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -143,58 +199,6 @@ class Header extends StatelessWidget {
               ),
             ],
           ),
-          // Admin Paneli Butonu - İletişim linkinin altında
-          StreamBuilder(
-            stream: AuthService().authStateChanges,
-            builder: (context, authSnapshot) {
-              if (authSnapshot.hasData) {
-                return FutureBuilder<bool>(
-                  future: AuthService().isAdmin(),
-                  builder: (context, adminSnapshot) {
-                    final isAdmin = adminSnapshot.data ?? false;
-                    final screenWidth = MediaQuery.of(context).size.width;
-                    final isSmallScreen = screenWidth < 768;
-                    
-                    if (isAdmin) {
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          top: SizeHelper.isMobile(context) ? 8 : 12,
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.pushNamed(context, '/admin-panel'),
-                            icon: Icon(
-                              Icons.admin_panel_settings,
-                              size: SizeHelper.clampFontSize(screenWidth, 14, 16, 18),
-                            ),
-                            label: Text(
-                              'Admin Paneli',
-                              style: TextStyle(
-                                fontSize: SizeHelper.clampFontSize(screenWidth, 11, 13, 15),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Color(0xFF2196F3)),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isSmallScreen ? 8 : 16,
-                                vertical: isSmallScreen ? 6 : 8,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
         ],
       ),
     );
@@ -235,38 +239,75 @@ class _NavItem extends StatelessWidget {
 // SliverPersistentHeader için delegate
 class HeaderSliverDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
-  final BuildContext context;
+  final BuildContext? context;
 
   HeaderSliverDelegate({
     required this.child,
-    required this.context,
+    this.context,
   });
+
+  double _calculateMaxExtent(BuildContext? buildContext) {
+    // Gerçek header yüksekliğini hesapla (admin butonu artık logo yanında, ekstra yükseklik yok)
+    // Admin butonu logo ile aynı satırda olduğu için ekstra yükseklik eklemiyor
+    // layoutExtent <= paintExtent olmalı
+    
+    // Önce build metodundaki context'i kullan, yoksa stored context'i kullan
+    final ctx = buildContext ?? context;
+    
+    // Context'e bağlı hesaplama yapmaya çalış
+    try {
+      if (ctx != null && ctx.mounted) {
+        try {
+          final mediaQuery = MediaQuery.maybeOf(ctx);
+          if (mediaQuery != null) {
+            final screenWidth = mediaQuery.size.width;
+            final isMobile = screenWidth < 600;
+            final isTablet = screenWidth >= 600 && screenWidth < 1024;
+            
+            // Logo yüksekliği + logo padding + vertical padding
+            // Admin butonu artık logo yanında, ekstra yükseklik yok
+            final logoHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
+            final logoPadding = isMobile ? 6.0 * 2 : 10.0 * 2;
+            final verticalPadding = isMobile ? 10.0 * 2 : (isTablet ? 16.0 * 2 : 20.0 * 2);
+            
+            // Temel yükseklik (logo ve padding) - admin butonu dahil değil
+            return verticalPadding + logoHeight + logoPadding;
+          }
+        } catch (e) {
+          debugPrint('⚠️ HeaderSliverDelegate maxExtent MediaQuery hatası: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ HeaderSliverDelegate maxExtent genel hata: $e');
+    }
+    
+    // Fallback: Desktop için temel yükseklik (admin butonu dahil değil)
+    // Desktop: 40 (vertical padding) + 70 (logo) + 20 (logo padding) = 130
+    return 130.0;
+  }
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
+    // Pinned header için shrinkOffset 0 olmalı ve child tam yükseklikte görünmeli
+    // Child'ı SizedBox ile sarmalayarak yüksekliği sabitle
+    // Bu, viewport'un null child hatası almasını önler
+    final height = _calculateMaxExtent(context);
+    return SizedBox(
+      height: height,
+      child: child,
+    );
   }
 
   @override
   double get maxExtent {
-    // Header'ın gerçek yüksekliğini hesapla
-    final isMobile = SizeHelper.isMobile(context);
-    final isTablet = SizeHelper.isTablet(context);
-    
-    // Logo yüksekliği + logo padding + vertical padding
-    final logoHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
-    final logoPadding = isMobile ? 6.0 * 2 : 10.0 * 2;
-    final verticalPadding = isMobile ? 10.0 * 2 : (isTablet ? 16.0 * 2 : 20.0 * 2);
-    // Admin paneli butonu için ekstra alan (alt satır)
-    final adminButtonHeight = isMobile ? 36.0 : 40.0; // Buton yüksekliği + padding
-    final adminButtonTopPadding = isMobile ? 8.0 : 12.0;
-    final totalHeight = verticalPadding + logoHeight + logoPadding + adminButtonHeight + adminButtonTopPadding;
-    
-    return totalHeight;
+    return _calculateMaxExtent(null);
   }
 
   @override
-  double get minExtent => maxExtent;
+  double get minExtent {
+    // Pinned header için minExtent = maxExtent olmalı
+    return maxExtent;
+  }
 
   @override
   bool shouldRebuild(HeaderSliverDelegate oldDelegate) {

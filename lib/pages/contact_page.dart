@@ -19,6 +19,7 @@ class ContactPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
       body: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
         slivers: [
           SliverPersistentHeader(
             pinned: true,
@@ -289,15 +290,15 @@ class _ContactContent extends StatelessWidget {
                             
                             if (gridWidth < 600) {
                               crossAxisCount = 1;
-                              aspectRatio = 1.0;
+                              aspectRatio = 1.5;
                               spacing = 12;
                             } else if (gridWidth < 1024) {
                               crossAxisCount = 2;
-                              aspectRatio = 1.1;
+                              aspectRatio = 1.6;
                               spacing = 16;
                             } else {
                               crossAxisCount = 2;
-                              aspectRatio = 1.1;
+                              aspectRatio = 1.6;
                               spacing = 20;
                             }
                             
@@ -417,7 +418,7 @@ class _ContactContent extends StatelessWidget {
                                   crossAxisCount: 2,
                                   crossAxisSpacing: 20,
                                   mainAxisSpacing: 20,
-                                  childAspectRatio: 1.2,
+                                  childAspectRatio: 1.8,
                                 ),
                                 itemCount: socialMediaList.length,
                                 itemBuilder: (context, index) {
@@ -795,7 +796,7 @@ class _SocialMediaCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 16 : 18),
+              padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 12 : 14),
               decoration: BoxDecoration(
                 color: socialMedia.color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
@@ -803,19 +804,19 @@ class _SocialMediaCard extends StatelessWidget {
               child: Icon(
                 socialMedia.icon,
                 color: socialMedia.color,
-                size: SizeHelper.isMobile(context) ? 32 : (SizeHelper.isTablet(context) ? 36 : 40),
+                size: SizeHelper.isMobile(context) ? 24 : (SizeHelper.isTablet(context) ? 28 : 32),
               ),
             ),
-            SizedBox(height: SizeHelper.isMobile(context) ? 12 : 14),
+            SizedBox(height: SizeHelper.isMobile(context) ? 8 : 10),
             Text(
               socialMedia.name,
               style: TextStyle(
                 color: hasUrl ? Colors.white : Colors.white54, // URL boşsa daha soluk
                 fontSize: SizeHelper.clampFontSize(
                   MediaQuery.of(context).size.width,
-                  12,
-                  14,
-                  16,
+                  11,
+                  13,
+                  15,
                 ),
                 fontWeight: FontWeight.bold,
               ),
@@ -834,8 +835,8 @@ class _SocialMediaCard extends StatelessWidget {
                 ),
               ),
             if (hasUrl) ...[
-              const SizedBox(height: 8),
-              const Icon(Icons.arrow_forward, color: Colors.white54, size: 16),
+              const SizedBox(height: 6),
+              const Icon(Icons.arrow_forward, color: Colors.white54, size: 14),
             ],
           ],
         ),

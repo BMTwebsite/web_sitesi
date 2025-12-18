@@ -104,6 +104,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
       body: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
         slivers: [
           SliverPersistentHeader(
             pinned: true,
@@ -111,6 +112,32 @@ class _HomePageState extends State<HomePage> {
             delegate: HeaderSliverDelegate(
               child: const Header(currentRoute: '/'),
               context: context,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: SizeHelper.isMobile(context) ? 16 : (SizeHelper.isTablet(context) ? 32 : 60),
+                vertical: SizeHelper.isMobile(context) ? 20 : (SizeHelper.isTablet(context) ? 30 : 40),
+              ),
+              color: const Color(0xFF0A0E17),
+              child: Center(
+                child: Text(
+                  'Bilgisayar Mühendisliği Topluluğu',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: SizeHelper.clampFontSize(
+                      MediaQuery.of(context).size.width,
+                      18,
+                      24,
+                      32,
+                    ),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ),
           SliverToBoxAdapter(
@@ -697,6 +724,24 @@ class _HeroSection extends StatelessWidget {
     final isMobile = SizeHelper.isMobile(context);
     final isTablet = SizeHelper.isTablet(context);
     
+    // imageOnly tipinde ve tablet/desktop ekranlarda tam ekran yap
+    final isLargeScreen = screenWidth >= 768;
+    final shouldRemovePadding = section.type == 'imageOnly' && isLargeScreen;
+    
+    // imageOnly ve büyük ekran için özel container - tam ekran
+    if (shouldRemovePadding && section.images.isNotEmpty) {
+      return SizedBox(
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height,
+        child: _HeroImageSlider(
+          images: section.images,
+          section: section,
+          height: MediaQuery.of(context).size.height,
+          fullScreen: true,
+        ),
+      );
+    }
+    
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -855,6 +900,7 @@ class _HomeSectionsList extends StatelessWidget {
           final otherSections = visibleSections.skip(1).toList();
 
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: otherSections.map((section) {
               return _buildSectionWidget(context, section);
             }).toList(),
@@ -876,6 +922,20 @@ class _HomeSectionsList extends StatelessWidget {
                       (section.description != null && section.description!.isNotEmpty));
     final showImages = (sectionType == 'imageOnly' || sectionType == 'both') && 
                        section.images.isNotEmpty;
+    
+    // imageOnly tipinde ve büyük ekranlarda padding'i kaldır ve tam ekran yap
+    // Tablet ve üzeri ekranlarda tam ekran yap (768px ve üzeri)
+    final isLargeScreen = screenWidth >= 768; // Tablet ve üzeri
+    final shouldRemovePadding = sectionType == 'imageOnly' && isLargeScreen;
+    
+    // imageOnly ve büyük ekran için özel container - tam ekran
+    if (shouldRemovePadding) {
+      return SizedBox(
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height,
+        child: _buildImageSlider(context, section.images, isMobile, isTablet, section: section, fullScreen: true),
+      );
+    }
     
     return Container(
       decoration: BoxDecoration(
@@ -935,7 +995,7 @@ class _HomeSectionsList extends StatelessWidget {
           
           // Büyük ekranlar için layout
           if (sectionType == 'imageOnly') {
-            // Sadece görsel
+            // Sadece görsel - küçük ekranlar için normal göster
             return _buildImageSlider(context, section.images, isMobile, isTablet, section: section);
           } else if (sectionType == 'textOnly') {
             // Sadece yazı
@@ -1060,17 +1120,19 @@ class _HomeSectionsList extends StatelessWidget {
   }
 
   // Çoklu görseller için otomatik slider widget'ı
-  Widget _buildImageSlider(BuildContext context, List<String> images, bool isMobile, bool isTablet, {HomeSectionData? section}) {
+  Widget _buildImageSlider(BuildContext context, List<String> images, bool isMobile, bool isTablet, {HomeSectionData? section, bool fullScreen = false}) {
     if (images.isEmpty) {
       return const SizedBox.shrink();
     }
 
     // Tek görsel varsa normal göster
     if (images.length == 1) {
+      final screenHeight = fullScreen ? MediaQuery.of(context).size.height : null;
       return Container(
-        height: isMobile ? 200 : (isTablet ? 300 : 400),
+        height: fullScreen ? screenHeight : (isMobile ? 200 : (isTablet ? 300 : 400)),
+        width: fullScreen ? double.infinity : null,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
           color: const Color(0xFF1A2332),
         ),
         child: Stack(
@@ -1080,7 +1142,7 @@ class _HomeSectionsList extends StatelessWidget {
                 ImageViewerDialog.show(context, images[0]);
               },
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
                 child: _buildWebImageHelper(images[0], context),
               ),
             ),
@@ -1092,8 +1154,9 @@ class _HomeSectionsList extends StatelessWidget {
     // Çoklu görsel varsa slider göster
     return _ImageSliderWidget(
       images: images,
-      height: isMobile ? 200 : (isTablet ? 300 : 400),
+      height: fullScreen ? null : (isMobile ? 200 : (isTablet ? 300 : 400)),
       section: section,
+      fullScreen: fullScreen,
     );
   }
 }
@@ -1103,11 +1166,13 @@ class _HeroImageSlider extends StatefulWidget {
   final List<String> images;
   final HomeSectionData section;
   final double height;
+  final bool fullScreen;
 
   const _HeroImageSlider({
     required this.images,
     required this.section,
     required this.height,
+    this.fullScreen = false,
   });
 
   @override
@@ -1209,8 +1274,9 @@ class _HeroImageSliderState extends State<_HeroImageSlider> {
 
     return Container(
       height: widget.height,
+      width: widget.fullScreen ? double.infinity : null,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: widget.fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
         color: const Color(0xFF1A2332),
       ),
       child: Stack(
@@ -1221,7 +1287,7 @@ class _HeroImageSliderState extends State<_HeroImageSlider> {
                     ImageViewerDialog.show(context, widget.images[0]);
                   },
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: widget.fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
                     child: _buildWebImage(widget.images[0], context),
                   ),
                 )
@@ -1239,7 +1305,7 @@ class _HeroImageSliderState extends State<_HeroImageSlider> {
                         ImageViewerDialog.show(context, widget.images[index]);
                       },
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: widget.fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
                         child: _buildWebImage(widget.images[index], context),
                       ),
                     );
@@ -1352,13 +1418,15 @@ class _HeroImageSliderState extends State<_HeroImageSlider> {
 // Otomatik slider widget'ı
 class _ImageSliderWidget extends StatefulWidget {
   final List<String> images;
-  final double height;
+  final double? height;
   final HomeSectionData? section;
+  final bool fullScreen;
 
   const _ImageSliderWidget({
     required this.images,
-    required this.height,
+    this.height,
     this.section,
+    this.fullScreen = false,
   });
 
   @override
@@ -1451,10 +1519,14 @@ class _ImageSliderWidgetState extends State<_ImageSliderWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final containerHeight = widget.fullScreen ? screenHeight : widget.height;
+    
     return Container(
-      height: widget.height,
+      height: containerHeight,
+      width: widget.fullScreen ? double.infinity : null,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: widget.fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
         color: const Color(0xFF1A2332),
       ),
       child: Stack(
@@ -1473,7 +1545,7 @@ class _ImageSliderWidgetState extends State<_ImageSliderWidget> {
                   ImageViewerDialog.show(context, widget.images[index]);
                 },
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: widget.fullScreen ? BorderRadius.zero : BorderRadius.circular(20),
                   child: _buildWebImage(widget.images[index], context),
                 ),
               );

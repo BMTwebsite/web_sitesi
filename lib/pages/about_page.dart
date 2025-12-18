@@ -21,6 +21,7 @@ class _AboutPageState extends State<AboutPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
       body: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
         slivers: [
           SliverPersistentHeader(
             pinned: true,

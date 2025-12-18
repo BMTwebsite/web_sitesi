@@ -89,7 +89,7 @@ class AnnouncementCard extends StatelessWidget {
                     topRight: Radius.circular(16),
                   ),
                   child: Container(
-                    height: constraints.maxHeight * 0.6, // Kart yüksekliğinin %60'ı
+                    height: constraints.maxHeight * 0.5, // Kart yüksekliğinin %50'si (daha küçük görsel)
                     width: double.infinity,
                     color: const Color(0xFF0A1929),
                     child: _buildPosterImage(

@@ -22,6 +22,7 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
       body: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
         slivers: [
           SliverPersistentHeader(
             pinned: true,
@@ -335,13 +336,13 @@ class _AnnouncementsContent extends StatelessWidget {
         
         if (screenWidth < 600) {
           crossAxisCount = 1;
-          aspectRatio = 0.55; // Mobil: daha uzun kartlar (afiş tam gözüksün)
+          aspectRatio = 0.75; // Mobil: daha küçük kartlar
         } else if (screenWidth < 1024) {
           crossAxisCount = 2;
-          aspectRatio = 0.6; // Tablet: 2 sütun (afiş tam gözüksün)
+          aspectRatio = 0.8; // Tablet: 2 sütun, daha küçük kartlar
         } else {
           crossAxisCount = screenWidth > 1400 ? 4 : 3;
-          aspectRatio = 0.55; // Desktop: 3-4 sütun (afiş tam gözüksün)
+          aspectRatio = 0.75; // Desktop: 3-4 sütun, daha küçük kartlar
         }
 
         return GridView.builder(

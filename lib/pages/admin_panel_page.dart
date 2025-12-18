@@ -5651,12 +5651,22 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
   @override
   void initState() {
     super.initState();
-    if (widget.section.images.isNotEmpty) {
+    _initializePageController();
+  }
+
+  void _initializePageController() {
+    // Filter out empty image URLs
+    final validImages = widget.section.images.where((url) => url.isNotEmpty).toList();
+    if (validImages.isNotEmpty) {
+      _pageController?.dispose();
       _pageController = PageController();
+      _currentIndex = 0;
       // 10 saniyede bir otomatik geçiş
+      _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-        if (mounted && widget.section.images.isNotEmpty && _pageController != null) {
-          final nextIndex = (_currentIndex + 1) % widget.section.images.length;
+        final currentValidImages = widget.section.images.where((url) => url.isNotEmpty).toList();
+        if (mounted && currentValidImages.isNotEmpty && _pageController != null) {
+          final nextIndex = (_currentIndex + 1) % currentValidImages.length;
           _pageController!.animateToPage(
             nextIndex,
             duration: const Duration(milliseconds: 500),
@@ -5664,6 +5674,23 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
           );
         }
       });
+    } else {
+      _pageController?.dispose();
+      _pageController = null;
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
+  void didUpdateWidget(_AdminHomeSectionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Images listesi değiştiyse PageController'ı yeniden başlat
+    final oldValidImages = oldWidget.section.images.where((url) => url.isNotEmpty).toList();
+    final newValidImages = widget.section.images.where((url) => url.isNotEmpty).toList();
+    if (oldValidImages.length != newValidImages.length ||
+        (newValidImages.isNotEmpty && _pageController == null)) {
+      _initializePageController();
     }
   }
 
@@ -5689,6 +5716,9 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Filter out empty image URLs
+    final validImages = widget.section.images.where((url) => url.isNotEmpty).toList();
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -5705,7 +5735,7 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image slider (if has images)
-            if (widget.section.images.isNotEmpty) ...[
+            if (validImages.isNotEmpty && _pageController != null) ...[
               Container(
                 height: 400,
                 decoration: BoxDecoration(
@@ -5721,12 +5751,12 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
                           _currentIndex = index;
                         });
                       },
-                      itemCount: widget.section.images.length,
+                      itemCount: validImages.length,
                       itemBuilder: (context, index) {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
-                            widget.section.images[index],
+                            validImages[index],
                             fit: BoxFit.contain,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
@@ -5767,7 +5797,7 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
-                          widget.section.images.length,
+                          validImages.length,
                           (index) => Container(
                             width: 8,
                             height: 8,
@@ -5793,8 +5823,8 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                if (_pageController != null && widget.section.images.length > 1) {
-                                  final previousIndex = (_currentIndex - 1 + widget.section.images.length) % widget.section.images.length;
+                                if (_pageController != null && validImages.length > 1) {
+                                  final previousIndex = (_currentIndex - 1 + validImages.length) % validImages.length;
                                   _pageController!.animateToPage(
                                     previousIndex,
                                     duration: const Duration(milliseconds: 300),
@@ -5820,7 +5850,7 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
                         ),
                       ),
                     // Sağ ok butonu (çoklu görsel varsa)
-                    if (widget.section.images.length > 1)
+                    if (validImages.length > 1)
                       Positioned(
                         right: 8,
                         top: 0,
@@ -5830,8 +5860,8 @@ class _AdminHomeSectionCardState extends State<_AdminHomeSectionCard> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                if (_pageController != null && widget.section.images.length > 1) {
-                                  final nextIndex = (_currentIndex + 1) % widget.section.images.length;
+                                if (_pageController != null && validImages.length > 1) {
+                                  final nextIndex = (_currentIndex + 1) % validImages.length;
                                   _pageController!.animateToPage(
                                     nextIndex,
                                     duration: const Duration(milliseconds: 300),
