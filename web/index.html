@@ -33,10 +33,13 @@
 
   <!-- Google Fonts - Roboto (optional, fallback to system fonts if fails) -->
   <!-- Performance: Preconnect to font domains for faster loading -->
+  <!-- Font yükleme hatası durumunda sistem fontları kullanılacak -->
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Performance: Font loading with display=swap for better perceived performance -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" onerror="console.warn('Roboto font yüklenemedi, sistem fontları kullanılacak')">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" 
+        onerror="console.warn('Roboto font yüklenemedi, sistem fontları kullanılacak'); this.onerror=null;"
+        onload="console.log('Roboto font başarıyla yüklendi')">
 
   <title>Bilgisayar Mühendisliği Topluluğu</title>
 
@@ -117,7 +120,25 @@
     }
   </style>
   
+  <!-- Flutter uygulamasının mount edileceği container -->
+  <div id="flutter-app"></div>
+  
   <script>
+    // Base href ayarını kontrol et ve düzelt
+    (function() {
+      try {
+        const baseElement = document.querySelector('base');
+        if (baseElement) {
+          const href = baseElement.getAttribute('href');
+          if (href === '$FLUTTER_BASE_HREF' || href === '/' || !href) {
+            baseElement.setAttribute('href', './');
+          }
+        }
+      } catch (e) {
+        console.warn('Base href ayarı yapılamadı:', e);
+      }
+    })();
+    
     // Performance: Optimize loading screen removal
     // Flutter yüklendikten sonra loading ekranını kaldır
     window.addEventListener('flutter-first-frame', function() {
@@ -127,13 +148,19 @@
       }
     }, { once: true }); // once: true ile event listener'ı sadece bir kez çalıştır
     
-    // Hata durumunda da loading'i kaldır
-    window.addEventListener('error', function() {
+    // Hata durumunda da loading'i kaldır ve hata mesajı göster
+    window.addEventListener('error', function(event) {
+      console.error('Sayfa yükleme hatası:', event.error || event.message);
       const loading = document.getElementById('loading');
       if (loading) {
-        loading.style.display = 'none';
+        loading.innerHTML = '<div style="text-align: center; color: white;"><p style="color: #F44336; margin-bottom: 10px;">Yükleme hatası oluştu</p><p style="font-size: 14px;">Sayfayı yenilemeyi deneyin (F5)</p></div>';
       }
     }, { once: true });
+    
+    // Unhandled promise rejection hatalarını yakala
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Promise rejection hatası:', event.reason);
+    });
     
     // 30 saniye sonra loading'i kaldır (timeout) - fallback
     setTimeout(function() {
@@ -145,6 +172,10 @@
   </script>
   
   <!-- Performance: Async script loading for non-blocking execution -->
+  <!-- Flutter bootstrap script'i yükle -->
+  <!-- Not: flutter_bootstrap.js otomatik olarak engine'i başlatır -->
+  <!-- window.flutterConfiguration deprecated - kullanmıyoruz -->
+  <!-- Flutter otomatik olarak HTML renderer'ı seçecek veya CanvasKit yüklenemezse HTML'ye geçecek -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

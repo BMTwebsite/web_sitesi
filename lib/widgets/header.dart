@@ -25,7 +25,7 @@ class Header extends StatelessWidget {
       ),
       padding: EdgeInsets.symmetric(
         horizontal: SizeHelper.isMobile(context) ? 12 : (SizeHelper.isTablet(context) ? 24 : 40),
-        vertical: SizeHelper.isMobile(context) ? 10 : (SizeHelper.isTablet(context) ? 16 : 20),
+        vertical: SizeHelper.isMobile(context) ? 6 : (SizeHelper.isTablet(context) ? 10 : 12),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -42,7 +42,7 @@ class Header extends StatelessWidget {
                   stream: firestoreProvider.getSiteSettingsStream(),
                   builder: (context, snapshot) {
                     final logoUrl = snapshot.data?['logoUrl'] ?? '';
-                    final logoSize = SizeHelper.isMobile(context) ? 50.0 : (SizeHelper.isTablet(context) ? 60.0 : 70.0);
+                    final logoSize = SizeHelper.isMobile(context) ? 35.0 : (SizeHelper.isTablet(context) ? 40.0 : 45.0);
                     
                     return Row(
                       mainAxisSize: MainAxisSize.min,
@@ -53,29 +53,29 @@ class Header extends StatelessWidget {
                             Navigator.pushNamed(context, '/admin-login');
                           },
                           child: Container(
-                            padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 6 : 10),
+                            padding: EdgeInsets.all(SizeHelper.isMobile(context) ? 4 : 6),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 CircularLogoWidget(
                                   size: logoSize,
-                                  padding: SizeHelper.isMobile(context) ? 4.0 : 6.0,
+                                  padding: SizeHelper.isMobile(context) ? 3.0 : 4.0,
                                   logoUrl: logoUrl.isNotEmpty ? logoUrl : null,
                                 ),
-                                SizedBox(width: SizeHelper.isMobile(context) ? 6 : 10),
+                                SizedBox(width: SizeHelper.isMobile(context) ? 4 : 6),
                                 Text(
                                   'BMT',
                                   style: TextStyle(
                                     color: const Color(0xFF0A1929),
                                     fontSize: SizeHelper.clampFontSize(
                                       MediaQuery.of(context).size.width,
+                                      10,
+                                      12,
                                       14,
-                                      18,
-                                      20,
                                     ),
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -266,9 +266,9 @@ class HeaderSliverDelegate extends SliverPersistentHeaderDelegate {
             
             // Logo yüksekliği + logo padding + vertical padding
             // Admin butonu artık logo yanında, ekstra yükseklik yok
-            final logoHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
-            final logoPadding = isMobile ? 6.0 * 2 : 10.0 * 2;
-            final verticalPadding = isMobile ? 10.0 * 2 : (isTablet ? 16.0 * 2 : 20.0 * 2);
+            final logoHeight = isMobile ? 35.0 : (isTablet ? 40.0 : 45.0);
+            final logoPadding = isMobile ? 4.0 * 2 : 6.0 * 2;
+            final verticalPadding = isMobile ? 6.0 * 2 : (isTablet ? 10.0 * 2 : 12.0 * 2);
             
             // Temel yükseklik (logo ve padding) - admin butonu dahil değil
             return verticalPadding + logoHeight + logoPadding;
@@ -282,8 +282,8 @@ class HeaderSliverDelegate extends SliverPersistentHeaderDelegate {
     }
     
     // Fallback: Desktop için temel yükseklik (admin butonu dahil değil)
-    // Desktop: 40 (vertical padding) + 70 (logo) + 20 (logo padding) = 130
-    return 130.0;
+    // Desktop: 24 (vertical padding) + 45 (logo) + 12 (logo padding) = 81
+    return 81.0;
   }
 
   @override

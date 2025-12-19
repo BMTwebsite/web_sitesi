@@ -22,31 +22,54 @@ import 'providers/firestore_provider.dart';
 import 'utils/custom_page_route.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Global hata yakalama - sadece debug modda log
+  // Hata yakalama mekanizmasını en başta kur
+  // Bu, uygulama başlatma sırasında oluşabilecek hataları yakalar
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     if (kDebugMode) {
       print('❌ Flutter Error: ${details.exception}');
       print('📚 Stack: ${details.stack}');
     }
+    // Web'de konsola da yazdır
+    if (kIsWeb) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        html.window.console.error('Flutter Error: ${details.exception}');
+      } catch (_) {}
+    }
   };
   
-  // Platform hatalarını yakala - sadece debug modda log
+  // Platform hatalarını yakala
   PlatformDispatcher.instance.onError = (error, stack) {
     if (kDebugMode) {
       print('❌ Platform Error: $error');
       print('📚 Stack: $stack');
     }
-    return true;
+    // Web'de konsola da yazdır
+    if (kIsWeb) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        html.window.console.error('Platform Error: $error');
+      } catch (_) {}
+    }
+    return true; // Hata işlendi, uygulama çalışmaya devam etsin
   };
+  
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+  } catch (e, stackTrace) {
+    if (kDebugMode) {
+      print('❌ WidgetsFlutterBinding hatası: $e');
+      print('📚 Stack trace: $stackTrace');
+    }
+    // Binding başlatılamazsa bile devam et
+  }
   
   bool firebaseInitialized = false;
   String? firebaseError;
   
   try {
-    // Firebase başlatma - production'da log yok
+    // Firebase başlatma - zaman aşımı ile
     await Firebase.initializeApp(
       options: FirebaseOptions(
         apiKey: Secrets.firebaseApiKey,
@@ -57,12 +80,15 @@ void main() async {
         appId: Secrets.firebaseAppId,
       ),
     ).timeout(
-      const Duration(seconds: 10),
+      const Duration(seconds: 15), // Zaman aşımını 15 saniyeye çıkar
       onTimeout: () {
         throw 'Firebase başlatma zaman aşımına uğradı. İnternet bağlantınızı kontrol edin.';
       },
     );
     firebaseInitialized = true;
+    if (kDebugMode) {
+      print('✅ Firebase başarıyla başlatıldı');
+    }
   } catch (e, stackTrace) {
     if (kDebugMode) {
       print('❌ Firebase başlatma hatası: $e');
@@ -73,7 +99,22 @@ void main() async {
     // Hata olsa bile uygulamayı çalıştırmaya devam et
   }
   
-  runApp(BMTApp(firebaseInitialized: firebaseInitialized, firebaseError: firebaseError));
+  // Uygulamayı başlat - hata olsa bile çalıştır
+  try {
+    runApp(BMTApp(firebaseInitialized: firebaseInitialized, firebaseError: firebaseError));
+  } catch (e, stackTrace) {
+    if (kDebugMode) {
+      print('❌ runApp hatası: $e');
+      print('📚 Stack trace: $stackTrace');
+    }
+    // runApp başarısız olursa, en azından bir hata mesajı göster
+    if (kIsWeb) {
+      try {
+        // ignore: avoid_web_libraries_in_flutter
+        html.window.alert('Uygulama başlatılamadı: $e\n\nLütfen sayfayı yenileyin (F5).');
+      } catch (_) {}
+    }
+  }
 }
 
 // Web'de hash kontrolü yap - eğer admin-verify varsa direkt AdminVerifyPage döndür
